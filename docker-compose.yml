@@ -1,0 +1,245 @@
+name: discore
+
+services:
+  # PostgreSQL 
+  postgres:
+    image: postgres:15-alpine
+    container_name: discore-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # - ./migrations:/docker-entrypoint-initdb.d:ro  # for migrations
+    ports: ["5432:5432"]
+    networks: [discore-net]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: bitnami/mongodb:latest
+    container_name: discore-mongodb
+    environment:
+      - MONGODB_ROOT_PASSWORD=${MONGODB_ROOT_PASSWORD}
+      - MONGODB_DATABASE=${MONGODB_DATABASE}
+      - MONGODB_USERNAME=${MONGODB_USERNAME}
+      - MONGODB_PASSWORD=${MONGODB_PASSWORD}
+    volumes:
+      - mongodb_data:/bitnami/mongodb  # Bitnami uses /bitnami, not /data/db
+    ports: ["27017:27017"]
+    networks: [discore-net]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # Redis with modules
+  redis:
+    build:
+      context: .
+    image: redis:7-alpine
+    container_name: discore-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD}  
+    volumes: [redis_data:/data]
+    ports: ["6379:6379"]
+    networks: [discore-net]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+  # Elasticsearch 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.2.3
+    container_name: discore-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - bootstrap.memory_lock=true
+    ulimits: {memlock: {soft: -1, hard: -1}}
+    volumes: [elasticsearch_data:/usr/share/elasticsearch/data]
+    ports: ["9200:9200"]
+    networks: [discore-net]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # # Kafka stack 
+  # zookeeper:
+  #   image: zookeeper:latest
+  #   container_name: discore-zookeeper
+  #   environment:
+  #     ALLOW_ANONYMOUS_LOGIN: "yes"
+  #     ZOOKEEPER_CLIENT_PORT: ${KAFKA_ZOOKEEPER_PORT}
+  #   volumes: [zookeeper_data:/zookeeper]
+  #   networks: [discore-net]
+  #   restart: unless-stopped
+
+  # kafka:
+  #   image: apache/kafka:latest
+  #   container_name: discore-kafka
+  #   environment:
+  #     KAFKA_BROKER_ID: 1
+  #     KAFKA_CFG_ZOOKEEPER_CONNECT: ${KAFKA_ZOOKEEPER_HOST}:${KAFKA_ZOOKEEPER_PORT}
+  #     KAFKA_CFG_LISTENERS: PLAINTEXT://:9092
+  #     KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://${KAFKA_HOST}:9092
+  #     KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+  #   volumes: [kafka_data:/bitnami/kafka]
+  #   ports: ["9092:9092"]
+  #   networks: [discore-net]
+  #   depends_on: [zookeeper]
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "kafka-broker-api-versions.sh", "--bootstrap-server", "localhost:9092"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
+
+
+  # Main App
+  app:
+    build:
+      context: ./                      # Points to project root
+      dockerfile: ./Dockerfile  # Path from context to Dockerfile
+    container_name: discore-app
+    ports:
+      - "${APP_PORT}:8080"
+      - "8081:8081"  # Health probe
+    environment:
+      - POSTGRES_HOST
+      - POSTGRES_PORT
+      - POSTGRES_DB
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - REDIS_HOST
+      - REDIS_PORT
+      - REDIS_PASSWORD
+      - KAFKA_HOST
+      - KAFKA_PORT
+      - ELASTICSEARCH_HOST
+      - ELASTICSEARCH_PORT
+      - RATE_LIMIT_PER_MINUTE
+      - MONGODB_HOST 
+      - MONGODB_USERNAME
+      - MONGODB_PASSWORD
+      - MONGODB_DATABASE
+    env_file: ./.env
+    depends_on:
+      postgres: {condition: service_healthy}
+      mongodb: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      # elasticsearch: {condition: service_healthy}
+      # kafka: {condition: service_healthy}
+    networks: [discore-net]
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Monitoring (200MB)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: discore-prometheus
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # for the localhost listen
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus  
+    ports: ["${PROMETHEUS_PORT}:9090"]
+    networks: [discore-net]
+    profiles: [monitoring]
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: discore-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+    volumes: [grafana_data:/var/lib/grafana]
+    ports: ["${GRAFANA_PORT}:3000"]
+    networks: [discore-net]
+    profiles: [monitoring]
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:latest
+    container_name: discore-loki
+    ports: ["3100:3100"]
+    command: -config.file=/etc/loki/local-config.yaml
+    networks: [discore-net]
+    profiles: [monitoring]
+
+  # Exporters
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    environment:
+      REDIS_ADDR: "redis://redis:6379"
+    ports:
+      - "9121:9121"
+    depends_on:
+      - redis
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    environment:
+      DATA_SOURCE_URI: "postgres:5432/testdb?sslmode=disable"
+      DATA_SOURCE_USER: "postgres"
+      DATA_SOURCE_PASS: "postgres"
+    ports:
+      - "9187:9187"
+    depends_on:
+      - postgres
+
+  mongodb-exporter:
+    image: percona/mongodb_exporter:0.40
+    command: --mongodb.uri=mongodb://admin:admin@mongo:27017 --collect-all
+    ports:
+      - "9216:9216"
+    depends_on:
+      - mongodb
+
+  elasticsearch-exporter:
+    image: prometheuscommunity/elasticsearch-exporter:latest
+    command: --es.uri=http://elasticsearch:9200 --es.all --es.indices --es.shards
+    ports:
+      - "9114:9114"
+    depends_on:
+      - elasticsearch
+
+volumes:
+  postgres_data:
+  mongodb_data: 
+  redis_data:
+  elasticsearch_data:
+  prometheus_data:
+  grafana_data:
+  # kafka_data:
+  # zookeeper_data:
+  
+
+networks:
+  discore-net:
+    driver: bridge

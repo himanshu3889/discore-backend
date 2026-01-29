@@ -1,0 +1,8 @@
+.vscode
+tmp
+.air.toml
+.env
+
+/dist/
+/build/
+/tmp/
