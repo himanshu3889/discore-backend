@@ -90,9 +90,23 @@ CREATE TABLE members (
 
 CREATE UNIQUE INDEX idx_members_unique_user_server ON members(user_id, server_id); -- uniqueness in table
 CREATE INDEX idx_members_server_id ON members(server_id, id);  -- find by server_id order by id(a sorted snowflake id); covering two queries in one index
-CREATE INDEX idx_members_user_created_server ON members (user_id, created_at, server_id); -- for getting user joined servers, table join at server_id
+CREATE INDEX idx_members_user_created_server ON members (user_id, created_at); -- for getting user joined servers
 
 -- CREATE INDEX idx_members_user_id ON members(user_id);  // from unique index on (user_id, server_id)
+
+CREATE TABLE conversations (
+    id BIGINT PRIMARY KEY,  -- Snowflake ID from app
+    user1_id       BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user2_id       BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at    TIMESTAMPTZ  DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ  DEFAULT NOW(),
+
+    -- Inline constraint (enforced in DDL)
+    CONSTRAINT check_user_order CHECK (user1_id < user2_id)
+);
+
+CREATE UNIQUE INDEX idx_conversations_pair  ON conversations(user1_id, user2_id);
+CREATE INDEX idx_conversations_user2_updated ON conversations(user2_id, updated_at DESC);  -- fast user1_id OR user2_id ORDER BY updated_at DESC;
 
 -- Trigger to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

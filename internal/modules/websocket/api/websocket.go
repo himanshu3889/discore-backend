@@ -8,5 +8,5 @@ import (
 )
 
 func RegisterWebsocketRoutes(rg *gin.RouterGroup) {
-	rg.GET("/ws", middlewares.JwtAuthMiddleware(), websocketApp.WsHandler)
+	rg.GET("/ws", middlewares.AuthMiddleware(), websocketApp.WsHandler)
 }

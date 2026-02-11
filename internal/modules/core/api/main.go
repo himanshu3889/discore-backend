@@ -1,11 +1,14 @@
 package coreApi
 
-import "github.com/gin-gonic/gin"
+import (
+	"discore/internal/modules/core/middlewares"
+
+	"github.com/gin-gonic/gin"
+)
 
 func RegisterCoreRoutes(rg *gin.RouterGroup) {
-	core := rg.Group("/core/api")
+	core := rg.Group("/core/api", middlewares.AuthMiddleware())
 	// core routes
-	registerAuthRoutes(core)
 	registerServerRoutes(core)
 	registerChannelRoutes(core)
 	registerMemberRoutes(core)

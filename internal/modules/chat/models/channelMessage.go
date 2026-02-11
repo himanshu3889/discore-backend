@@ -14,10 +14,10 @@ type ChannelMessage struct {
 	UserID    snowflake.ID `bson:"user_id" json:"userID"`                       // Who sent it
 	ServerID  snowflake.ID `bson:"server_id" json:"serverID"`
 	ChannelID snowflake.ID `bson:"channel_id" json:"channelID"` // Which channel
-	// Author: full details required
+	Deleted   *bool        `bson:"deleted" json:"-"`
+	CreatedAt time.Time    `bson:"created_at" json:"createdAt"`
+	EditedAt  *time.Time   `bson:"edited_at" json:"editedAt"`
+	User      *User        `json:"user"` // not in db; user send
 	// Mentions:
 	// ReferencedMessageID:
-	Deleted   *bool      `bson:"deleted" json:"-"`
-	CreatedAt *time.Time `bson:"created_at" json:"createdAt"`
-	EditedAt  *time.Time `bson:"edited_at" json:"editedAt"`
 }

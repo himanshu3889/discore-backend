@@ -3,8 +3,6 @@ package baseMiddlewares
 import (
 	"time"
 
-	// basePrometheus "discore/internal/base/infrastructure/prometheus"
-
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )

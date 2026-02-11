@@ -1,9 +1,14 @@
 package chatApi
 
-import "github.com/gin-gonic/gin"
+import (
+	"discore/internal/modules/chat/middlewares"
+
+	"github.com/gin-gonic/gin"
+)
 
 func RegisterChatRoutes(rg *gin.RouterGroup) {
-	chatGrp := rg.Group("/chat/api")
+	chatGrp := rg.Group("/chat/api", middlewares.AuthMiddleware())
 
-	registerMessageRoutes(chatGrp)
+	registerChannelMessageRoutes(chatGrp)
+	registerConversationRoutes(chatGrp)
 }

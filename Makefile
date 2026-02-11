@@ -33,7 +33,7 @@ migrate-new:
 	migrate create -ext sql -dir internal/modules/core/migrations -seq $${name}
 
 
-# Docker commands
+# Docker project commands
 
 up-db:
 	docker compose up -d postgres mongodb redis
@@ -47,12 +47,41 @@ up-mon:
 down-mon:
 	docker compose down prometheus grafana
 
+up-sys:
+	docker compose up -d postgres mongodb redis kafka
+
+down-sys:
+	docker compose down
+
+
 cont-urls:
 	@echo "Prometheus: http://localhost:9090"
 	@echo "Grafana: http://localhost:9300"
 
 
 
+
+# KAKFA Commands
+KAFKA_CONTAINER ?= discore-kafka
+BOOTSTRAP_SERVER ?= localhost:9092
+
+KAFKA_GROUP_CMD = docker exec -it $(KAFKA_CONTAINER) \
+	/opt/kafka/bin/kafka-consumer-groups.sh \
+	--bootstrap-server $(BOOTSTRAP_SERVER)
+
+KAFKA_CONSUMER_CMD = docker exec -it $(KAFKA_CONTAINER) \
+	/opt/kafka/bin/kafka-console-consumer.sh \
+	--bootstrap-server $(BOOTSTRAP_SERVER)
+
+KAFKA_TOPIC_CMD = docker exec -it $(KAFKA_CONTAINER) \
+	/opt/kafka/bin/kafka-topics.sh \
+	--bootstrap-server $(BOOTSTRAP_SERVER)
+
+kafka-grp:
+	$(KAFKA_GROUP_CMD) $(args)
+
+kafka-grp-describe:
+	$(KAFKA_GROUP_CMD) --describe --group $(group)
 
 
 	

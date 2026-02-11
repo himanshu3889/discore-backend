@@ -2,16 +2,16 @@ package coreApi
 
 import (
 	"discore/internal/base/utils"
+	channelCacheStore "discore/internal/modules/core/cacheStore/channel"
 	"discore/internal/modules/core/middlewares"
 	"discore/internal/modules/core/models"
-	channelStore "discore/internal/modules/core/store/channel"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
 func registerChannelRoutes(r *gin.RouterGroup) {
-	channelGroup := r.Group("/channels", middlewares.JwtAuthMiddleware())
+	channelGroup := r.Group("/channels")
 	channelRoutes(channelGroup)
 }
 
@@ -39,7 +39,7 @@ func CreateChannel(ctx *gin.Context) {
 	// FIXME: Admin or moderator only can create the channel in the server
 	incomingChannel.CreatorID = userID
 
-	err := channelStore.CreateChannel(ctx, incomingChannel)
+	err := channelCacheStore.CreateChannel(ctx, incomingChannel)
 	if err != nil {
 		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
 		return
@@ -65,7 +65,7 @@ func GetChannelByID(ctx *gin.Context) {
 		return
 	}
 
-	channel, err := channelStore.GetChannelByID(ctx, channelSnowID)
+	channel, err := channelCacheStore.GetChannelByID(ctx, channelSnowID)
 	if err != nil {
 		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
 		return
@@ -99,7 +99,7 @@ func UpdateChannelByID(ctx *gin.Context) {
 
 	incomingChannel.ID = channelSnowID
 
-	err = channelStore.UpdateChannelNameType(ctx, incomingChannel)
+	err = channelCacheStore.UpdateChannelNameType(ctx, incomingChannel)
 	if err != nil {
 		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
 		return
@@ -125,7 +125,7 @@ func DeleteChannelByID(ctx *gin.Context) {
 		return
 	}
 
-	_, err = channelStore.HardDeleteChannelById(ctx, channelSnowID)
+	_, err = channelCacheStore.HardDeleteChannelById(ctx, channelSnowID)
 	if err != nil {
 		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
 		return

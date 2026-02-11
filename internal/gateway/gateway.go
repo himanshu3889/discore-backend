@@ -4,6 +4,9 @@ import (
 	redisDatabase "discore/internal/base/infrastructure/redis"
 	baseMiddlewares "discore/internal/base/middlewares"
 	"discore/internal/base/utils"
+	authentictionApi "discore/internal/gateway/authenticationService/api"
+	authMiddleware "discore/internal/gateway/authenticationService/middlewares"
+	rateLimitingMiddleware "discore/internal/gateway/rateLimitService/middlewares"
 	"net/http"
 	"runtime/debug"
 
@@ -63,26 +66,42 @@ func (g *Gateway) setupRoutes() {
 	g.engine.Use(gin.Recovery())
 
 	// Health check
-	g.engine.GET("/health", func(c *gin.Context) {
+	g.engine.GET("/health-check", func(c *gin.Context) {
 		utils.RespondWithSuccess(c, http.StatusOK, gin.H{"message": "OK"})
 	})
 
 	// Prometheus
 	g.engine.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
-	// Private routes with rate limiting and auth
+	// Public routes
+	public := g.engine.Group("/api")
+	g.addPublicMiddleware(public)
+	authentictionApi.RegisterAuthRoutes(public)
+
+	// Private routes
 	private := g.engine.Group("")
-	// Authentication
-	// private.Use(g.authenticationMiddleware())  // TODO: handle authentication at this layer
-	// Rate limit middleware
-	private.Use(g.rateLimitMiddleware())
-	// Metrics logging
-	private.Use(baseMiddlewares.MetricsMiddleware())
-	private.Use(baseMiddlewares.LatencyLoggerMiddleware()) // Middleware for the latency logging
+	g.addPrivateMiddleware(private)
 
 	{
 		private.GET("/ws", g.proxyHandler(WebsocketAddr))
 		private.Any("/chat/api/*path", g.proxyHandler(ChatAddr))
 		private.Any("/core/api/*path", g.proxyHandler(CoreAddr))
 	}
+}
+
+// Public routes
+func (g *Gateway) addPublicMiddleware(group *gin.RouterGroup) {
+	group.Use(baseMiddlewares.CORSMiddleware())
+	group.Use(baseMiddlewares.RequestIDMiddleware())
+	group.Use(rateLimitingMiddleware.RateLimitMiddleware(g.limiter))
+	group.Use(baseMiddlewares.LatencyLoggerMiddleware())
+}
+
+// Private routes
+func (g *Gateway) addPrivateMiddleware(group *gin.RouterGroup) {
+	group.Use(baseMiddlewares.CORSMiddleware())
+	group.Use(baseMiddlewares.RequestIDMiddleware())
+	group.Use(authMiddleware.JwtAuthMiddleware(true))
+	group.Use(rateLimitingMiddleware.RateLimitMiddleware(g.limiter))
+	group.Use(baseMiddlewares.LatencyLoggerMiddleware())
 }

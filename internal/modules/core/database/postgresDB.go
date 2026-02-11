@@ -1,9 +1,10 @@
 package database
 
 import (
+	"discore/configs"
 	"fmt"
-	"os"
 	"sync"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
@@ -21,10 +22,10 @@ func InitPostgresDB() {
 	once.Do(func() {
 		dsn := fmt.Sprintf(
 			"host=%s user=%s password=%s dbname=%s sslmode=disable",
-			os.Getenv("POSTGRES_HOST"),
-			os.Getenv("POSTGRES_USER"),
-			os.Getenv("POSTGRES_PASSWORD"),
-			os.Getenv("POSTGRES_DB"),
+			configs.Config.POSTGRES_HOST,
+			configs.Config.POSTGRES_USER,
+			configs.Config.POSTGRES_PASSWORD,
+			configs.Config.POSTGRES_DB,
 		)
 
 		var err error
@@ -38,7 +39,10 @@ func InitPostgresDB() {
 			logrus.WithError(err).Fatal("Failed to ping PostgreSQL")
 		}
 
-		PostgresDB.SetMaxOpenConns(50) // set max connections
+		// Set pool limits (adjust as needed)
+		PostgresDB.SetMaxOpenConns(25)
+		PostgresDB.SetMaxIdleConns(25)
+		PostgresDB.SetConnMaxLifetime(5 * time.Minute)
 
 		logrus.Info("Postgres Database connected successfully")
 

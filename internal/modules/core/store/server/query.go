@@ -36,30 +36,41 @@ func UserJoinedServers(ctx context.Context, user_id snowflake.ID) ([]*models.Ser
 
 }
 
-// Get server by ID where user is a member
-func GetServerByIDWithMembership(ctx context.Context, serverID snowflake.ID, userID snowflake.ID) (*models.Server, error) {
+// Returns both server and member for user
+func GetServerMembershipForUser(ctx context.Context, serverID snowflake.ID, userID snowflake.ID) (*models.Server, *models.Member, error) {
 	const query = `
-		SELECT s.*
-		FROM servers s
-		INNER JOIN members m ON s.id = m.server_id
-		WHERE s.id = $1 AND m.user_id = $2
+		SELECT s.*,
+		       m.id AS "member.id",
+		       m.role AS "member.role",
+		       m.user_id AS "member.user_id",
+		       m.server_id AS "member.server_id",
+		       m.created_at AS "member.created_at",
+		       m.updated_at AS "member.updated_at",
+		       m.deleted_at AS "member.deleted_at"
+		FROM members m
+		INNER JOIN servers s ON s.id = m.server_id
+		WHERE m.server_id = $1 AND m.user_id = $2
 		LIMIT 1
 	`
 
-	var server models.Server
-	err := database.PostgresDB.GetContext(ctx, &server, query, serverID, userID)
+	var dest struct {
+		models.Server
+		Member models.Member `db:"member"`
+	}
+
+	err := database.PostgresDB.GetContext(ctx, &dest, query, serverID, userID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil // Server not found or user not a member
+			return nil, nil, nil
 		}
 		logrus.WithFields(logrus.Fields{
 			"server_id": serverID,
 			"user_id":   userID,
 		}).WithError(err).Error("Failed to find server with membership")
-		return nil, errors.New("failed to find server")
+		return nil, nil, errors.New("failed to find server")
 	}
 
-	return &server, nil
+	return &dest.Server, &dest.Member, nil
 }
 
 // Get user first server
@@ -160,31 +171,36 @@ func GetServerMembers(ctx context.Context, serverId snowflake.ID, limit int, aft
 	var query string
 	var args []interface{}
 
-	// First page
-	query = `
-		SELECT *
-		FROM members
-		WHERE server_id = $1
-		ORDER BY id ASC
-		LIMIT $2
-	`
-	args = []interface{}{serverId, limit}
+	// Single query with INNER JOIN on user_id
+	baseQuery := `
+	SELECT 
+			m.id, m.role, m.user_id, m.server_id, m.created_at, m.updated_at, m.deleted_at,
+			u.id as user_user_id, u.email as user_email, u.name as user_name, u.image_url as user_image_url
+		FROM members m
+		INNER JOIN users u ON m.user_id = u.id
+		WHERE m.server_id = $1
+		`
 
 	if afterSnowflake > 0 {
-		// Get members created after this afterSnowflake ID
-		query = `
-            SELECT *
-            FROM members
-            WHERE server_id = $1 AND id > $2
-            ORDER BY id ASC
-            LIMIT $3
-        `
+		query = baseQuery + ` AND m.id > $2 ORDER BY m.id ASC LIMIT $3`
 		args = []interface{}{serverId, afterSnowflake, limit}
+	} else {
+		// First page
+		query = baseQuery + ` ORDER BY m.id ASC LIMIT $2`
+		args = []interface{}{serverId, limit}
 	}
 
 	// Populate server.Channels slice
-	var members []*models.Member
-	err := database.PostgresDB.SelectContext(ctx, &members, query, args...)
+	// Temporary struct for scanning with aliases
+	type memberUserScan struct {
+		models.Member
+		UserID       snowflake.ID `db:"user_user_id"`
+		UserEmail    string       `db:"user_email"`
+		UserName     string       `db:"user_name"`
+		UserImageUrl string       `db:"user_image_url"`
+	}
+	var scans []*memberUserScan
+	err := database.PostgresDB.SelectContext(ctx, &scans, query, args...)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return []*models.Member{}, nil
@@ -202,6 +218,21 @@ func GetServerMembers(ctx context.Context, serverId snowflake.ID, limit int, aft
 	// if err != nil {
 	// 	return nil, err
 	// }
+
+	// Map to actual Member structs with User populated
+	members := make([]*models.Member, len(scans))
+	for i, scan := range scans {
+		member := &scan.Member
+		if scan.UserID > 0 { // Only populate if user exists
+			member.User = &models.User{
+				ID:       scan.UserID,
+				Email:    scan.UserEmail,
+				Name:     scan.UserName,
+				ImageUrl: scan.UserImageUrl,
+			}
+		}
+		members[i] = member
+	}
 
 	return members, nil
 }

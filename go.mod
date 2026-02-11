@@ -22,7 +22,7 @@ require (
 	github.com/prometheus/client_golang v1.23.2 // Prometheus metrics
 	github.com/redis/go-redis/v9 v9.17.2 // All-in-one Redis client
 	github.com/riandyrn/otelchi v0.10.0 // OpenTelemetry tracing (optional)
-	github.com/segmentio/kafka-go v0.4.47 // Kafka, high throughput
+	github.com/segmentio/kafka-go v0.4.50 // Kafka, high throughput
 	github.com/sony/gobreaker/v2 v2.0.0 // Circuit breaker
 	github.com/spf13/viper v1.19.0 // Config management
 	go.mongodb.org/mongo-driver v1.17.6 // MongoDB driver
@@ -66,7 +66,8 @@ require (
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/jmoiron/sqlx v1.4.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.18.0 // indirect
+	github.com/kelseyhightower/envconfig v1.4.0 // indirect
+	github.com/klauspost/compress v1.18.3 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lib/pq v1.10.9 // indirect
@@ -78,7 +79,7 @@ require (
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
-	github.com/pierrec/lz4/v4 v4.1.16 // indirect
+	github.com/pierrec/lz4/v4 v4.1.25 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect

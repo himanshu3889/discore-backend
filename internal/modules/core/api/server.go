@@ -2,19 +2,19 @@ package coreApi
 
 import (
 	"discore/internal/base/utils"
+	channelCacheStore "discore/internal/modules/core/cacheStore/channel"
+	serverCacheStore "discore/internal/modules/core/cacheStore/server"
 	"discore/internal/modules/core/middlewares"
 	"discore/internal/modules/core/models"
-	channelStore "discore/internal/modules/core/store/channel"
 	memberStore "discore/internal/modules/core/store/member"
 	serverStore "discore/internal/modules/core/store/server"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 )
 
 func registerServerRoutes(r *gin.RouterGroup) {
-	serverGroup := r.Group("/servers", middlewares.JwtAuthMiddleware())
+	serverGroup := r.Group("/servers")
 	serverRoutes(serverGroup)
 
 }
@@ -28,7 +28,7 @@ func serverRoutes(rg *gin.RouterGroup) {
 	rg.GET("/:serverID/user/channels", UserServerChannels)
 	rg.POST("/:serverID/invite-code", CreateServerInvite)
 	rg.POST("/accept-invite/:inviteCode", AcceptServerInvite)
-	rg.GET("/:serverID/members", GetServerMembers) // [ ]: NOT TESTED YET
+	rg.GET("/:serverID/members", GetServerMembers)
 }
 
 // User first joined server
@@ -71,18 +71,18 @@ func UserServer(ctx *gin.Context) {
 		return
 	}
 
-	userServer, err := serverStore.GetServerByIDWithMembership(ctx, serverSnowID, userID)
+	userServer, member, err := serverStore.GetServerMembershipForUser(ctx, serverSnowID, userID)
 	if err != nil {
 		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	if userServer == nil {
-		utils.RespondWithSuccess(ctx, http.StatusOK, gin.H{"server": nil, "message": "User has not joined any servers"})
+		utils.RespondWithSuccess(ctx, http.StatusOK, gin.H{"server": nil, "member": nil, "message": "User has not joined any servers"})
 		return
 	}
 
-	utils.RespondWithSuccess(ctx, http.StatusOK, gin.H{"server": userServer, "message": "Server found"})
+	utils.RespondWithSuccess(ctx, http.StatusOK, gin.H{"server": userServer, "member": member, "message": "Server found"})
 }
 
 // Get User server channels
@@ -103,25 +103,26 @@ func UserServerChannels(ctx *gin.Context) {
 		return
 	}
 
-	userServer, err := serverStore.GetServerByIDWithMembership(ctx, serverSnowID, userID)
+	server, member, err := serverStore.GetServerMembershipForUser(ctx, serverSnowID, userID)
 	if err != nil {
 		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	if userServer == nil {
-		utils.RespondWithSuccess(ctx, http.StatusOK, gin.H{"server": nil, "message": "User has not member of the server"})
+	if server == nil {
+		// FIXME: return error as invalid access
+		utils.RespondWithSuccess(ctx, http.StatusOK, gin.H{"server": nil, "member": nil, "message": "User has not member of the server"})
 		return
 	}
 
-	serverChannels, err := serverStore.GetServerChannels(ctx, serverSnowID)
+	serverChannels, err := serverCacheStore.GetServerChannels(ctx, serverSnowID)
 
 	if err != nil {
 		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	utils.RespondWithSuccess(ctx, http.StatusOK, gin.H{"server": userServer, "channels": serverChannels, "message": "Server found"})
+	utils.RespondWithSuccess(ctx, http.StatusOK, gin.H{"server": server, "member": member, "channels": serverChannels, "message": "Server found"})
 }
 
 // Get User server members; user should be member of the server
@@ -142,7 +143,7 @@ func GetServerMembers(ctx *gin.Context) {
 		return
 	}
 
-	userServer, err := serverStore.GetServerByIDWithMembership(ctx, serverSnowID, userID)
+	userServer, _, err := serverStore.GetServerMembershipForUser(ctx, serverSnowID, userID)
 	if err != nil {
 		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
 		return
@@ -153,7 +154,7 @@ func GetServerMembers(ctx *gin.Context) {
 		return
 	}
 
-	members, err := serverStore.GetServerMembers(ctx, serverSnowID, 50, 0)
+	members, err := serverCacheStore.GetServerMembers(ctx, serverSnowID, 50, 0)
 	if err != nil {
 		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
 		return
@@ -199,7 +200,7 @@ func CreateServer(ctx *gin.Context) {
 		return
 	}
 	incomingServer.OwnerID = userID
-	err := serverStore.CreateServer(ctx, incomingServer)
+	err := serverCacheStore.CreateServer(ctx, incomingServer)
 	if err != nil {
 		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
 		return
@@ -211,7 +212,7 @@ func CreateServer(ctx *gin.Context) {
 		CreatorID: incomingServer.OwnerID,
 		ServerID:  incomingServer.ID,
 	}
-	err = channelStore.CreateChannel(ctx, createdChannel)
+	err = channelCacheStore.CreateChannel(ctx, createdChannel)
 	if err != nil {
 		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
 		return
@@ -276,7 +277,7 @@ func EditServer(ctx *gin.Context) {
 		return
 	}
 
-	err = serverStore.UpdateServerNameImage(ctx, incomingServer)
+	err = serverCacheStore.UpdateServerNameImage(ctx, incomingServer)
 	if err != nil {
 		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
 		return
@@ -309,7 +310,7 @@ func CreateServerInvite(ctx *gin.Context) {
 
 	incomingServerInvite.ServerID = serverSnowID
 	incomingServerInvite.CreatedBy = userID
-	err = serverStore.CreateServerInvite(ctx, incomingServerInvite)
+	err = serverCacheStore.CreateServerInvite(ctx, incomingServerInvite)
 	if err != nil {
 		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
 		return
@@ -335,15 +336,15 @@ func AcceptServerInvite(ctx *gin.Context) {
 		Code: inviteCode,
 	}
 
-	server_id, err := serverStore.AcceptServerInviteAndCreateMember(ctx, userID, incomingServerInvite.Code)
+	serverInvite, err := serverCacheStore.AcceptServerInviteAndCreateMember(ctx, userID, incomingServerInvite.Code)
 	if err != nil {
-		logrus.WithError(err).Error("Unable to accept")
+		// logrus.WithError(err).Error("Unable to accept")
 		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
 		return
 	}
 	utils.RespondWithSuccess(ctx, http.StatusOK, gin.H{
 		"message":     "Server invite accepted",
 		"invite_code": incomingServerInvite.Code,
-		"server_id":   server_id,
+		"server_id":   serverInvite.ServerID,
 	})
 }

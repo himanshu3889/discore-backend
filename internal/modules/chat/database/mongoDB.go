@@ -2,8 +2,8 @@ package database
 
 import (
 	"context"
+	"discore/configs"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -18,12 +18,12 @@ import (
 var (
 	MongoClient *mongo.Client
 	MongoDB     *mongo.Database
-	once        sync.Once
+	mongoOnce   sync.Once
 )
 
 // Initialize mongoDB establishes connection and creates indexes
 func InitMongoDB() {
-	once.Do(func() {
+	mongoOnce.Do(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
@@ -33,10 +33,10 @@ func InitMongoDB() {
 		}
 
 		// Configure client
-		username := os.Getenv("MONGODB_USERNAME")
-		password := os.Getenv("MONGODB_PASSWORD")
-		host := os.Getenv("MONGODB_HOST")
-		database := os.Getenv("MONGODB_DATABASE")
+		username := configs.Config.MONGODB_USERNAME
+		password := configs.Config.MONGODB_PASSWORD
+		host := configs.Config.MONGODB_HOST
+		database := configs.Config.MONGODB_DATABASE
 
 		uri := fmt.Sprintf("mongodb://%s:%s@%s:27017/%s?authSource=%s",
 			username, password, host, database, database)
@@ -78,9 +78,10 @@ func createIndexes(ctx context.Context) {
 		{
 			// Main channel queries
 			Keys: bson.D{
-				{"channelId", 1}, // Filter by channel
-				{"deleted", 1},   // Filter by deleted status
-				{"_id", -1},      // Sort by createdAt (newest first)
+				{"channel_id", 1}, // Equality: Filter by channel
+				{"deleted", 1},    // Equality: Filter by deleted status
+				{"server_id", 1},  // Equality: Filter by server
+				{"_id", -1},       // Sort: matches descending sort + range query
 			},
 		},
 		// {
@@ -94,22 +95,15 @@ func createIndexes(ctx context.Context) {
 		// },
 	})
 
-	// Conversation unique constraint
-	MongoDB.Collection("conversations").Indexes().CreateOne(ctx, mongo.IndexModel{
-		Keys: bson.D{
-			{"memberOneID", 1},
-			{"memberTwoID", 1},
-		},
-		Options: options.Index().SetUnique(true),
-	})
-	MongoDB.Collection("conversations").Indexes().CreateMany(ctx, []mongo.IndexModel{
-		{Keys: bson.D{{"memberTwoID", 1}}},
-	})
-
 	// DirectMessage indexes
-	MongoDB.Collection("directMessages").Indexes().CreateMany(ctx, []mongo.IndexModel{
-		{Keys: bson.D{{"conversationID", 1}}},
-		{Keys: bson.D{{"memberID", 1}}},
+	MongoDB.Collection("direct_messages").Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{
+			Keys: bson.D{
+				{"conversation_id", 1}, // Equality: filter by conversation
+				{"deleted", 1},         // Equality: filter by deleted flag
+				{"_id", -1},            // Sort: matches descending sort + range query
+			},
+		},
 	})
 }
 

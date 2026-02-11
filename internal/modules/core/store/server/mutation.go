@@ -121,6 +121,98 @@ func CreateServerInvite(ctx context.Context, serverInvite *models.ServerInvite) 
 	return fmt.Errorf("Failed to create server invite for user: too many collisions")
 }
 
+// Accept the server invite and create memember; if already a member then don't consume invite, return serverInvite
+// TODO: updating a column here on accepting; what if thunder herd ?
+// Use max use , expiry logic etc, async update the usage
+func AcceptServerInviteAndCreateMember(ctx context.Context, userID snowflake.ID, code string) (*models.ServerInvite, error) {
+	// Get the server ID from the code
+	tx, err := database.PostgresDB.BeginTxx(ctx, nil)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"invite_code": code,
+		}).WithError(err).Error("Failed to begin the server invite accept transaction")
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback() // Rollback if transaction failed
+
+	// Find the server_id
+	var serverInvite models.ServerInvite
+	inviteQuery := `SELECT * FROM server_invites WHERE code=$1`
+	err = tx.GetContext(ctx, &serverInvite, inviteQuery, code)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"invite_code": code,
+		}).WithError(err).Errorf("Failed to query the server invite in database")
+		return nil, fmt.Errorf("Failed to accept the invite")
+	}
+
+	serverID := serverInvite.ServerID
+
+	// Try to create member → Consume invite → Commit
+
+	// Try to create member FIRST
+	member := &models.Member{
+		ID:       utils.GenerateSnowflakeID(),
+		UserID:   userID,
+		ServerID: serverID,
+		Role:     "GUEST",
+	}
+
+	// Returning *
+	insertQuery := `INSERT INTO members (id, role, user_id, server_id, created_at, updated_at)
+                    VALUES ($1, $2, $3, $4, NOW(), NOW())
+                    RETURNING *`
+
+	err = tx.GetContext(ctx, member, insertQuery,
+		member.ID,
+		member.Role,
+		member.UserID,
+		member.ServerID)
+	if err != nil {
+		if coreUtils.IsDBUniqueViolationError(err) {
+			return &serverInvite, nil // errors.New("Already a member of this server")
+		}
+		logrus.WithFields(logrus.Fields{
+			"role":      member.Role,
+			"server_id": member.ServerID,
+			"user_id":   member.UserID,
+		}).WithError(err).Error("Failed to create member in database")
+		return &serverInvite, errors.New("Failed to create member for server")
+	}
+
+	updateQuery := `UPDATE server_invites
+					SET used_count = used_count + 1
+					WHERE code=$1
+						AND (max_uses IS NULL OR used_count < max_uses)
+						AND (expires_at IS NULL OR expires_at > NOW())`
+
+	result, err := tx.ExecContext(ctx, updateQuery, code)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"invite_code": code,
+		}).WithError(err).Errorf("Failed to update invite in database")
+		return &serverInvite, fmt.Errorf("Unable to accept the invite")
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		logrus.WithFields(logrus.Fields{
+			"invite_code": code,
+		}).WithError(err).Errorf("invite is invalid, expired, or maxed out")
+		return &serverInvite, errors.New("invite is invalid, expired, or maxed out")
+	}
+
+	// Commit transaction
+	if err = tx.Commit(); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"invite_code": code,
+		}).WithError(err).Errorf("failed to commit server invite accept transaction")
+		return &serverInvite, fmt.Errorf("Unable to accept the invite")
+	}
+
+	return &serverInvite, nil
+}
+
 // User server invite
 func UseServerInvite(ctx context.Context, code string) error {
 	result, err := database.PostgresDB.ExecContext(ctx,
@@ -147,92 +239,4 @@ func UseServerInvite(ctx context.Context, code string) error {
 		return errors.New("Server invite is invalid, expired, or maxed out")
 	}
 	return nil
-}
-
-// Accept the server invite and create memember; if already a member then don't consume invite
-func AcceptServerInviteAndCreateMember(ctx context.Context, userID snowflake.ID, code string) (*snowflake.ID, error) {
-	// Get the server ID from the code
-	tx, err := database.PostgresDB.BeginTxx(ctx, nil)
-	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"invite_code": code,
-		}).WithError(err).Error("Failed to begin the server invite accept transaction")
-		return nil, fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback() // Rollback if transaction failed
-
-	// Find the server_id
-	var serverID snowflake.ID
-	serverQuery := `SELECT server_id FROM server_invites WHERE code=$1`
-	err = tx.GetContext(ctx, &serverID, serverQuery, code)
-	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"invite_code": code,
-		}).WithError(err).Errorf("Failed to query the server invite in database")
-		return nil, fmt.Errorf("Failed to accept the invite")
-	}
-
-	// Try to create member → Consume invite → Commit
-
-	// Try to create member FIRST
-	member := &models.Member{
-		ID:       utils.GenerateSnowflakeID(),
-		UserID:   userID,
-		ServerID: serverID,
-		Role:     "GUEST",
-	}
-
-	// Returning *
-	insertQuery := `INSERT INTO members (id, role, user_id, server_id, created_at, updated_at)
-                    VALUES ($1, $2, $3, $4, NOW(), NOW())
-                    RETURNING *`
-
-	err = tx.GetContext(ctx, member, insertQuery,
-		member.ID,
-		member.Role,
-		member.UserID,
-		member.ServerID)
-	if err != nil {
-		if coreUtils.IsDBUniqueViolationError(err) {
-			return &serverID, nil // errors.New("Already a member of this server")
-		}
-		logrus.WithFields(logrus.Fields{
-			"role":      member.Role,
-			"server_id": member.ServerID,
-			"user_id":   member.UserID,
-		}).WithError(err).Error("Failed to create member in database")
-		return nil, errors.New("Failed to create member for server")
-	}
-
-	updateQuery := `UPDATE server_invites
-					SET used_count = used_count + 1
-					WHERE code=$1
-						AND (max_uses IS NULL OR used_count < max_uses)
-						AND (expires_at IS NULL OR expires_at > NOW())`
-
-	result, err := tx.ExecContext(ctx, updateQuery, code)
-	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"invite_code": code,
-		}).WithError(err).Errorf("Failed to update invite in database")
-		return nil, fmt.Errorf("Unable to accept the invite")
-	}
-
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		logrus.WithFields(logrus.Fields{
-			"invite_code": code,
-		}).WithError(err).Errorf("invite is invalid, expired, or maxed out")
-		return nil, errors.New("invite is invalid, expired, or maxed out")
-	}
-
-	// Commit transaction
-	if err = tx.Commit(); err != nil {
-		logrus.WithFields(logrus.Fields{
-			"invite_code": code,
-		}).WithError(err).Errorf("failed to commit server invite accept transaction")
-		return nil, fmt.Errorf("Unable to accept the invite")
-	}
-
-	return &member.ServerID, nil
 }

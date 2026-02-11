@@ -14,6 +14,7 @@ DROP TABLE IF EXISTS server_invites CASCADE;
 DROP TABLE IF EXISTS servers CASCADE;
 DROP TABLE IF EXISTS user_sessions CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS conversations
 
 -- Drop enum types
 DROP TYPE IF EXISTS member_role;

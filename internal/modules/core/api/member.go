@@ -3,7 +3,7 @@ package coreApi
 import (
 	"discore/internal/base/utils"
 	"discore/internal/modules/core/middlewares"
-	accountStore "discore/internal/modules/core/store/account"
+
 	memberStore "discore/internal/modules/core/store/member"
 	"net/http"
 
@@ -11,7 +11,7 @@ import (
 )
 
 func registerMemberRoutes(r *gin.RouterGroup) {
-	memberGroup := r.Group("/members", middlewares.JwtAuthMiddleware())
+	memberGroup := r.Group("/members")
 	memberRoutes(memberGroup)
 }
 
@@ -48,7 +48,7 @@ func GetUserServerMember(ctx *gin.Context) {
 	utils.RespondWithSuccess(ctx, http.StatusOK, gin.H{"member": member, "message": "Channel found"})
 }
 
-// Get the user and member in the user joined server
+// Get the single user with membership in the user joined server
 func GetUserServerMemberProfile(ctx *gin.Context) {
 	userID, _, isOk := middlewares.GetContextUserIDEmail(ctx)
 	if !isOk {
@@ -73,11 +73,5 @@ func GetUserServerMemberProfile(ctx *gin.Context) {
 		return
 	}
 
-	// Get the user
-	user, err := accountStore.GetUserByID(ctx, userID)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
-		return
-	}
-	utils.RespondWithSuccess(ctx, http.StatusOK, gin.H{"member": member, "user": user, "message": "Channel found"})
+	utils.RespondWithSuccess(ctx, http.StatusOK, gin.H{"member": member, "message": "Channel found"})
 }

@@ -1,10 +1,10 @@
 package gateway
 
 import (
+	"discore/configs"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -19,7 +19,7 @@ func (g *Gateway) proxyHandler(target string) gin.HandlerFunc {
 	proxy.Director = func(req *http.Request) {
 		req.URL.Scheme = targetURL.Scheme
 		req.URL.Host = targetURL.Host
-		req.Header.Set("X-Gateway-Secret", os.Getenv("GATEWAY_SECRET"))
+		req.Header.Set("X-Gateway-Secret", configs.Config.GATEWAY_SECRET) // TODO: need to use for the service
 	}
 
 	// Custom error handling

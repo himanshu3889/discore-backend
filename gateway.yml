@@ -1,3 +1,4 @@
+# TODO: NEED TO USE IN THE GATEWAY
 routes:    
   - path: "/ws"
     auth: true
