@@ -27,14 +27,17 @@ func GetUsersBatch(ctx context.Context, userIDs []snowflake.ID) (map[snowflake.I
 	// Prepare Redis keys
 	keys := make([]string, len(userIDs))
 	idMap := make(map[string]snowflake.ID, len(userIDs)) // for mapping back
+
+	var key string
+	var cacheBoundedKey string
 	for i, id := range userIDs {
-		key := rediskeys.Keys.User.Info(id)
+		key, cacheBoundedKey = rediskeys.Keys.User.Info(id)
 		keys[i] = key
 		idMap[key] = id
 	}
 
 	// Bulk fetch from Redis
-	cachedData, err := redisDatabase.GlobalCacheManager.MGet(ctx, keys)
+	cachedData, err := redisDatabase.GlobalCacheManager.MGet(ctx, cacheBoundedKey, keys)
 	if err != nil {
 		logrus.WithError(err).Error("Redis MGet failed")
 		// If Redis fails, treat all as missing

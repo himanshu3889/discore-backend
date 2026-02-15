@@ -14,20 +14,21 @@ type Consumer struct {
 	handler func(*kafka.Message) error
 }
 
+// New kafka consumer
 func NewConsumer(brokers []string, groupID string, topic string, handler func(*kafka.Message) error) *Consumer {
 
-	// 1. Create a custom Dialer with longer timeouts for Docker/Windows
+	// Create a custom Dialer with longer timeouts for Docker/Windows
 	dialer := &kafka.Dialer{
 		Timeout:   10 * time.Second,
 		DualStack: false, //controls whether your app tries both IPv4 and IPv6 to connect to Kafka.
 	}
 
-	// 2. Configure the Reader
+	// Configure the Reader
 	config := kafka.ReaderConfig{
 		Brokers: brokers,
 		GroupID: groupID,
 		Topic:   topic,
-		// Partition: 0, // <--- ENSURE THIS IS DELETED OR COMMENTED OUT
+		// Partition: 0, //
 
 		// Small batches for instant feedback while learning
 		MinBytes: 1,
@@ -42,16 +43,16 @@ func NewConsumer(brokers []string, groupID string, topic string, handler func(*k
 		StartOffset:    kafka.FirstOffset,
 		CommitInterval: 1 * time.Second,
 
-		// 3. ATTACH THE DIALER
+		// ATTACH THE DIALER
 		Dialer: dialer,
 
-		// 4. ENABLE INTERNAL DEBUGGING (This answers "Did we join?")
+		// ENABLE INTERNAL DEBUGGING
 		// This prints directly to stdout so you can see the handshake
 		Logger: kafka.LoggerFunc(func(msg string, args ...interface{}) {
 			// logrus.Infof("[KAFKA-DEBUG] "+msg, args...)
 		}),
 		ErrorLogger: kafka.LoggerFunc(func(msg string, args ...interface{}) {
-			logrus.Warnf("[KAFKA-ERROR] "+msg, args...)
+			// logrus.Warnf("[KAFKA-ERROR] "+msg, args...)
 		}),
 	}
 
@@ -61,6 +62,7 @@ func NewConsumer(brokers []string, groupID string, topic string, handler func(*k
 	}
 }
 
+// Start the kafka consumer
 func (c *Consumer) Start(ctx context.Context) error {
 	logrus.Info("Consumer started, joining group...") // Add this
 	for {
@@ -91,6 +93,7 @@ func (c *Consumer) Start(ctx context.Context) error {
 	}
 }
 
+// Close the kafka consumer
 func (c *Consumer) Close() error {
 	return c.reader.Close()
 }

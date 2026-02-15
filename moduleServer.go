@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
 
@@ -42,6 +43,7 @@ func (s *ModuleServer) Initialize() {
 	logrus.SetFormatter(&utils.LogrusColorFormatter{})
 
 	router := gin.New()
+	router.Use(baseMiddlewares.MetricsMiddleware()) // Captures metrics
 	router.Use(baseMiddlewares.RequestIDMiddleware())
 	router.Use(gin.Recovery())
 
@@ -51,6 +53,8 @@ func (s *ModuleServer) Initialize() {
 	coreApi.RegisterCoreRoutes(baseGroup)
 	chatApi.RegisterChatRoutes(baseGroup)
 	websocketApi.RegisterWebsocketRoutes(baseGroup)
+	// Prometheus
+	baseGroup.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	s.server = &http.Server{
 		Addr:    s.addr,

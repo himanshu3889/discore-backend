@@ -28,13 +28,13 @@ func LatencyLoggerMiddleware() gin.HandlerFunc {
 		}
 
 		// Decide log level
-		switch {
-		case status >= 500:
-			logrus.WithFields(fields).Error("API Request")
-		case status >= 400:
-			logrus.WithFields(fields).Warn("API Request")
-		default:
-			logrus.WithFields(fields).Info("API Request")
-		}
+		// switch {
+		// case status >= 500:
+		// 	logrus.WithFields(fields).Error("API Request")
+		// case status >= 400:
+		// 	logrus.WithFields(fields).Warn("API Request")
+		// default:
+		// 	logrus.WithFields(fields).Info("API Request")
+		// }
 	}
 }

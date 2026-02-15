@@ -80,7 +80,6 @@ func createIndexes(ctx context.Context) {
 			Keys: bson.D{
 				{"channel_id", 1}, // Equality: Filter by channel
 				{"deleted", 1},    // Equality: Filter by deleted status
-				{"server_id", 1},  // Equality: Filter by server
 				{"_id", -1},       // Sort: matches descending sort + range query
 			},
 		},

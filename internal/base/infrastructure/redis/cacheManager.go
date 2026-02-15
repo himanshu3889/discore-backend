@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"discore/internal/base/infrastructure/redis/bloomFilter"
+	baseMetrics "discore/internal/base/metric"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -14,6 +15,12 @@ import (
 )
 
 const NULL_Value = "__NULL__"
+
+// Create a small internal struct to carry the state through singleflight
+type fetchResult struct {
+	data         []byte
+	isBloomBlock bool
+}
 
 // CacheManager handles all cache operations with optional Bloom filter integration
 type CacheManager struct {
@@ -33,7 +40,7 @@ func NewCacheManager(client *redis.Client, bloomMgr *bloomFilter.BloomManager) *
 
 // Set stores data in cache and optionally adds to bloom filter
 // data can be any type - will be JSON marshaled
-func (cm *CacheManager) Set(ctx context.Context, cacheKey string, bloomKey *bloomFilter.BloomFilterKey, data interface{}, ttl time.Duration) error {
+func (cm *CacheManager) Set(ctx context.Context, cacheKey string, bloomKey *bloomFilter.BloomFilterKey, data interface{}, bloomItem *string, ttl time.Duration) error {
 	// Marshal data
 
 	isNilData := data == nil
@@ -64,11 +71,11 @@ func (cm *CacheManager) Set(ctx context.Context, cacheKey string, bloomKey *bloo
 	}
 
 	// Add to bloom filter if configured
-	if cm.bloomMgr != nil && bloomKey != nil && *bloomKey != "" {
+	if cm.bloomMgr != nil && bloomKey != nil && *bloomKey != "" && bloomItem != nil && *bloomItem != "" {
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
-			_ = cm.bloomMgr.Add(ctx, *bloomKey, cacheKey)
+			_ = cm.bloomMgr.Add(ctx, *bloomKey, *bloomItem)
 		}()
 	}
 
@@ -77,42 +84,43 @@ func (cm *CacheManager) Set(ctx context.Context, cacheKey string, bloomKey *bloo
 
 // Get retrieves data from cache with optional bloom filter check
 // Returns raw bytes or nil (if not exists) - caller handles unmarshaling
-func (cm *CacheManager) Get(ctx context.Context, cacheKey string, bloomKey *bloomFilter.BloomFilterKey) ([]byte, error) {
-	result, err, _ := cm.group.Do(cacheKey, func() (interface{}, error) {
+func (cm *CacheManager) Get(ctx context.Context, boundedKey string, cacheKey string, bloomKey *bloomFilter.BloomFilterKey, bloomItem *string) ([]byte, error) {
+	start := time.Now()
+
+	rawResult, err, _ := cm.group.Do(cacheKey, func() (interface{}, error) {
 		// Check bloom filter first if configured
-		if cm.bloomMgr != nil && *bloomKey != "" {
-			// logrus.Info("[Bloom check]")
-			mightExist, err := cm.bloomMgr.MightContain(ctx, *bloomKey, cacheKey)
-			if err != nil {
-				// Log error but continue (fail open)
-			} else if !mightExist {
-				return nil, nil
+		if cm.bloomMgr != nil && bloomKey != nil && *bloomKey != "" && bloomItem != nil && *bloomItem != "" {
+			mightExist, err := cm.bloomMgr.MightContain(ctx, *bloomKey, *bloomItem)
+			if err == nil && !mightExist {
+				// Bloom filter says it definitely doesn't exist
+				return fetchResult{data: nil, isBloomBlock: true}, nil
 			}
 
 		}
 		// Get from cache
-		// logrus.Info("[Cache check]")
 		val, err := cm.client.Get(ctx, cacheKey).Bytes()
-		if err != nil {
-			if err == redis.Nil {
-				return nil, redis.Nil
-			}
-			return nil, fmt.Errorf("cache get failed: %w", err)
-		}
-
-		return val, nil
+		return fetchResult{data: val, isBloomBlock: false}, err
 	})
 
+	// Extract values safely
+	var res fetchResult
+	if rawResult != nil {
+		res = rawResult.(fetchResult)
+	}
+
+	// for EVERY caller in the singleflight group
+	cm.recordMetric(boundedKey, err, res.isBloomBlock, time.Since(start))
+
 	if err != nil {
+		if err == redis.Nil {
+			return nil, nil
+		}
 		return nil, err
 	}
 
-	resultBytes, ok := result.([]byte) // go value to byte slice
-	if !ok {
-		return nil, fmt.Errorf("unexpected type from cache: %T", result)
-	}
+	resultBytes := res.data
 
-	if bytes.Equal(resultBytes, []byte(NULL_Value)) {
+	if resultBytes == nil || bytes.Equal(resultBytes, []byte(NULL_Value)) {
 		return nil, nil
 	}
 
@@ -126,32 +134,85 @@ func (cm *CacheManager) Delete(ctx context.Context, cacheKey string) error {
 
 // MGet retrieves multiple keys from Redis cache
 // Returns a map of cacheKey -> raw value (string or []byte)
-func (cm *CacheManager) MGet(ctx context.Context, cacheKeys []string) (map[string][]byte, error) {
+func (cm *CacheManager) MGet(ctx context.Context, boundedKey string, cacheKeys []string) (map[string][]byte, error) {
 	if len(cacheKeys) == 0 {
 		return map[string][]byte{}, nil
 	}
 
+	start := time.Now()
+
 	vals, err := cm.client.MGet(ctx, cacheKeys...).Result()
+
+	duration := time.Since(start)
+
 	if err != nil {
+		cm.recordMetric(boundedKey, err, false, duration)
 		return nil, fmt.Errorf("cache MGet failed: %w", err)
 	}
 
+	hits, misses := 0, 0
 	result := make(map[string][]byte, len(cacheKeys))
 	for i, v := range vals {
-		if v != nil {
-			var bytes []byte
-			switch t := v.(type) {
-			case string:
-				bytes = []byte(t)
-			case []byte:
-				bytes = t
-			default:
-				// unexpected type, skip
-				continue
-			}
-			result[cacheKeys[i]] = bytes
+		if v == nil {
+			misses++
+			continue
 		}
 
+		var resultBytes []byte
+		switch t := v.(type) {
+		case string:
+			resultBytes = []byte(t)
+		case []byte:
+			resultBytes = t
+		default:
+			continue
+		}
+
+		if bytes.Equal(resultBytes, []byte(NULL_Value)) {
+			result[cacheKeys[i]] = nil
+		} else {
+			result[cacheKeys[i]] = resultBytes
+		}
+
+		hits++
+
 	}
+
+	cm.recordMultiGetMetric(boundedKey, hits, misses, duration)
+
 	return result, nil
+}
+
+// recordMetric internal helper to update Prometheus
+func (cm *CacheManager) recordMultiGetMetric(metricKey string, hits int, misses int, duration time.Duration) {
+	if metricKey == "" {
+		return
+	}
+	baseMetrics.CacheHits.WithLabelValues(metricKey).Add(float64(hits))
+	baseMetrics.CacheMisses.WithLabelValues(metricKey).Add(float64(misses))
+	baseMetrics.CacheLatency.WithLabelValues(metricKey, "mget").Observe(duration.Seconds())
+}
+
+// recordMetric internal helper to update Prometheus
+func (cm *CacheManager) recordMetric(metricKey string, err error, isBloomBlock bool, duration time.Duration) {
+	if metricKey == "" {
+		return
+	}
+
+	if isBloomBlock {
+		return
+	}
+
+	status := "hit"
+	// It's a miss if redis returned Nil or if bloom filter returned nil result without error
+	if err == redis.Nil {
+		status = "miss"
+		baseMetrics.CacheMisses.WithLabelValues(metricKey).Inc()
+	} else if err == nil {
+		baseMetrics.CacheHits.WithLabelValues(metricKey).Inc()
+	} else {
+		status = "error"
+	}
+
+	baseMetrics.CacheLatency.WithLabelValues(metricKey, status).Observe(duration.Seconds())
 }

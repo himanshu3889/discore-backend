@@ -70,6 +70,9 @@ type BroadcastRequest struct {
 	Room   string           `json:"room"`
 	Data   *json.RawMessage `json:"data"`
 	Action *string          `json:"action"`
+
+	// Internal: When did this message enter the system?
+	PipelineStart time.Time `json:"-"`
 }
 
 type SubscribePool struct {
@@ -84,6 +87,7 @@ const (
 	registerBufferLen     = 100
 	unregisterBufferLen   = 100
 	roomOutBufferLen      = 100
+	clientBufferSize      = 20
 )
 
 // Hub maintains the set of active clients and broadcasts messages to them.
@@ -159,13 +163,18 @@ func (hub *Hub) run() {
 	for {
 		select {
 
-		case client, ok := <-hub.register: // to register the client; not room joining
+		case _, ok := <-hub.register: // to register the client; not room joining
 			if !ok {
 				// Closed
 				return
 			}
+
 			atomic.AddInt32(&hub.totalClients, 1)
-			logrus.Infof("Client registered: %s (Total: %d)", client.conn.RemoteAddr(), hub.totalClients)
+
+			// [METRIC]
+			hub.MetricTrackConnect(true)
+
+			// logrus.Infof("Client registered: %s (Total: %d)", client.conn.RemoteAddr(), hub.totalClients)
 
 		case client, ok := <-hub.unregister:
 			if !ok {
@@ -182,7 +191,11 @@ func (hub *Hub) run() {
 			}
 
 			atomic.AddInt32(&hub.totalClients, -1)
-			logrus.Infof("Client unregistered: %s (Total: %d)", client.conn.RemoteAddr(), hub.totalClients)
+
+			// [METRIC]
+			hub.MetricTrackConnect(false)
+
+			// logrus.Infof("Client unregistered: %s (Total: %d)", client.conn.RemoteAddr(), hub.totalClients)
 
 			// 	//  Now Workers will handle the subscriptions
 			// case roomRequest := <-hub.subscribe.queue:
@@ -203,6 +216,24 @@ func (hub *Hub) NewRoomState(name string) *RoomState {
 			typers: make(map[UserID]bool),
 		},
 	}
+}
+
+// Get or Create room without safety; take hub lock before using this
+func (hub *Hub) GetOrCreateRoom(name string) *RoomState {
+
+	// Return existing if found
+	if room, exists := hub.rooms[name]; exists {
+		return room
+	}
+
+	// Create and Register new room
+	newRoom := hub.NewRoomState(name)
+	hub.rooms[name] = newRoom
+
+	// [METRIC] : Increment Metric
+	hub.MetricTrackRoom(true)
+
+	return newRoom
 }
 
 // Cleanup when hub shuts down

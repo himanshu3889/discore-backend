@@ -23,10 +23,11 @@ func CreateServer(ctx context.Context, server *models.Server) error {
 	}
 
 	// async write to cache
-	serverCacheKey := rediskeys.Keys.Server.Info(server.ID)
+	serverCacheKey, _ := rediskeys.Keys.Server.Info(server.ID)
 	serverBloomKey := bloomFilter.ServerIDBloomFilter
+	bloomItem := server.ID.String()
 	go func() {
-		redisDatabase.GlobalCacheManager.Set(ctx, serverCacheKey, &serverBloomKey, server, 14*24*time.Hour)
+		redisDatabase.GlobalCacheManager.Set(ctx, serverCacheKey, &serverBloomKey, server, &bloomItem, 14*24*time.Hour)
 	}()
 
 	return nil
@@ -41,10 +42,11 @@ func UpdateServerNameImage(ctx context.Context, server *models.Server) error {
 	}
 
 	// async write to cache
-	serverCacheKey := rediskeys.Keys.Server.Info(server.ID)
+	serverCacheKey, _ := rediskeys.Keys.Server.Info(server.ID)
 	serverBloomKey := bloomFilter.ServerIDBloomFilter
+	bloomItem := server.ID.String()
 	go func() {
-		redisDatabase.GlobalCacheManager.Set(ctx, serverCacheKey, &serverBloomKey, server, 14*24*time.Hour)
+		redisDatabase.GlobalCacheManager.Set(ctx, serverCacheKey, &serverBloomKey, server, &bloomItem, 14*24*time.Hour)
 	}()
 
 	return nil
@@ -59,10 +61,11 @@ func CreateServerInvite(ctx context.Context, serverInvite *models.ServerInvite) 
 	}
 
 	// async write to cache
-	serverInviteCacheKey := rediskeys.Keys.ServerInvite.Info(serverInvite.Code)
+	serverInviteCacheKey, _ := rediskeys.Keys.ServerInvite.Info(serverInvite.Code)
 	serverBloomKey := bloomFilter.ServerInviteBloomFilter
+	bloomItem := serverInvite.Code
 	go func() {
-		redisDatabase.GlobalCacheManager.Set(ctx, serverInviteCacheKey, &serverBloomKey, serverInvite, 14*24*time.Hour)
+		redisDatabase.GlobalCacheManager.Set(ctx, serverInviteCacheKey, &serverBloomKey, serverInvite, &bloomItem, 14*24*time.Hour)
 	}()
 
 	return nil
@@ -71,9 +74,10 @@ func CreateServerInvite(ctx context.Context, serverInvite *models.ServerInvite) 
 // Accept the server invite and create memember; if already a member then don't consume invite, return serverInvite
 func AcceptServerInviteAndCreateMember(ctx context.Context, userID snowflake.ID, code string) (*models.ServerInvite, error) {
 	// Check in cache first then accept
-	serverInviteCacheKey := rediskeys.Keys.ServerInvite.Info(code)
+	serverInviteCacheKey, cacheBoundedKey := rediskeys.Keys.ServerInvite.Info(code)
 	serverInviteBloomKey := bloomFilter.ServerInviteBloomFilter
-	codeBytes, cacheErr := redisDatabase.GlobalCacheManager.Get(ctx, serverInviteCacheKey, &serverInviteBloomKey)
+	bloomItem := code
+	codeBytes, cacheErr := redisDatabase.GlobalCacheManager.Get(ctx, cacheBoundedKey, serverInviteCacheKey, &serverInviteBloomKey, &bloomItem)
 	if codeBytes == nil {
 		// Server invite does not exist
 		return nil, fmt.Errorf("Invalid code")
@@ -89,6 +93,7 @@ func AcceptServerInviteAndCreateMember(ctx context.Context, userID snowflake.ID,
 			serverInviteCacheKey,
 			&serverInviteBloomKey,
 			serverInvite,
+			&bloomItem,
 			24*time.Hour,
 		)
 	}

@@ -18,6 +18,7 @@ type ConsumerManager struct {
 	cancel    context.CancelFunc
 }
 
+// New consumer manager for the kafka
 func NewConsumerManager(name string) *ConsumerManager {
 	return &ConsumerManager{
 		name:      name,

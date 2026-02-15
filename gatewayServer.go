@@ -45,8 +45,6 @@ func (s *GatewayServer) Initialize() {
 	}
 
 	gatewayAuthDatabase.InitPostgresDB()
-	// Note: Redis is initialized twice in your original code,
-	// but once is enough if they share the same instance
 }
 
 func (s *GatewayServer) Start() error {

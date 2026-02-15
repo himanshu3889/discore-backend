@@ -4,6 +4,7 @@ package baseKafka
 import (
 	"context"
 	"discore/internal/base/utils"
+	"fmt"
 	"time"
 
 	"github.com/bwmarrin/snowflake"
@@ -16,6 +17,7 @@ type KafkaProducer struct {
 	writer *kafka.Writer
 }
 
+// New kafka producer
 func NewProducer(brokers []string) *KafkaProducer {
 	return &KafkaProducer{
 		writer: &kafka.Writer{
@@ -52,21 +54,53 @@ func NewProducer(brokers []string) *KafkaProducer {
 
 // Send puts any data on any topic.
 // Key is used for partitioning (same key = same partition = ordering)
-func (p *KafkaProducer) Send(ctx context.Context, topic, key string, data []byte, userID snowflake.ID) error {
+// Send produces a message. It accepts optional headers to support context propagation.
+func (p *KafkaProducer) Send(ctx context.Context, topic, key string, data []byte, userID snowflake.ID, extraHeaders ...kafka.Header) error {
 
-	snowflakeID := utils.GenerateSnowflakeID()
+	// Default headers we always want
+	headers := []kafka.Header{
+		{Key: "user_id", Value: []byte(userID.String())},
+		{Key: "publish_time", Value: []byte(fmt.Sprintf("%d", time.Now().UnixMilli()))}, // When *this* specific hop happened
+	}
+
+	// Helper: Check if specific keys were provided in extraHeaders
+	// NOTE: immutable, You must copy-paste them from the incoming message to the outgoing message every time you republish
+	hasTraceID := false
+	hasIngestTime := false
+
+	for _, h := range extraHeaders {
+		if string(h.Key) == "trace_id" {
+			hasTraceID = true
+		}
+		if string(h.Key) == "ingest_time" {
+			hasIngestTime = true
+		}
+		headers = append(headers, h)
+	}
+
+	// If no Trace ID passed (New Message), generate one
+	if !hasTraceID {
+		headers = append(headers, kafka.Header{
+			Key: "trace_id", Value: []byte(utils.GenerateSnowflakeID().String()),
+		})
+	}
+
+	// If no Ingest Time passed (New Message), use Now
+	if !hasIngestTime {
+		headers = append(headers, kafka.Header{
+			Key: "ingest_time", Value: []byte(fmt.Sprintf("%d", time.Now().UnixMilli())),
+		})
+	}
+
 	return p.writer.WriteMessages(ctx, kafka.Message{
-		Topic: topic,
-		Key:   []byte(key),
-		Value: data,
-		Headers: []kafka.Header{
-			{Key: "ID", Value: []byte(snowflakeID.String())}, // Unique snowflake id
-			{Key: "timestamp", Value: []byte(time.Now().Format(time.RFC3339))},
-			{Key: "userID", Value: []byte(userID.String())},
-		},
+		Topic:   topic,
+		Key:     []byte(key),
+		Value:   data,
+		Headers: headers,
 	})
 }
 
+// Close kafka producer
 func (p *KafkaProducer) Close() error {
 	return p.writer.Close()
 }

@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/sirupsen/logrus"
 )
 
 // readPump reads messages from the WebSocket connection.
@@ -34,7 +33,7 @@ func (client *Client) ReadPump(hub *Hub) {
 		_, recMessage, err := client.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				logrus.WithError(err).Error("Read error")
+				// logrus.WithError(err).Error("Websocket read error")
 			}
 			break
 		}
@@ -78,13 +77,13 @@ func (client *Client) WritePump() {
 			}
 
 			if err := client.conn.WritePreparedMessage(preparedMsg); err != nil {
-				logrus.WithError(err).Error("Write error")
+				// logrus.WithError(err).Error("Write error")
 				return
 			}
 		case <-ticker.C:
 			// Send ping messages to keep the connection alive
 			if err := client.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				logrus.WithError(err).Error("Ping error")
+				// logrus.WithError(err).Error("Websocket ping error")
 				return
 			}
 

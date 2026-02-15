@@ -68,8 +68,7 @@ func (hub *Hub) SubscribeRoom(roomReq *RoomRequest) {
 
 	newRoom := hub.rooms[newRoomName]
 	if newRoom == nil {
-		newRoom = hub.NewRoomState(newRoomName)
-		hub.rooms[newRoomName] = newRoom
+		hub.GetOrCreateRoom(newRoomName)
 	}
 	hub.mu.Unlock()
 
@@ -159,6 +158,9 @@ func (hub *Hub) subscribeWorker(ctx context.Context) {
 				// Closed
 				return
 			}
+
+			// [METRIC] : Job picked up
+			hub.MetricSubscribeQueueDepth(true)
 
 			// Process job
 			hub.BuildRoomBroadcaster(roomRequest.name)

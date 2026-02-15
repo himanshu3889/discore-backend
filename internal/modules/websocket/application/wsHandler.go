@@ -34,7 +34,7 @@ func WsHandler(ctx *gin.Context) {
 	}
 
 	conn.SetReadLimit(1024 * 1024) // Add this: reject messages > 1024 KB
-	clientBufferSize := 20
+
 	client := &Client{conn: conn, send: make(chan *websocket.PreparedMessage, clientBufferSize), userID: userID, done: make(chan struct{})}
 
 	globalHub.register <- client // Register the new client

@@ -13,9 +13,10 @@ import (
 )
 
 func GetChannelByID(ctx *gin.Context, channelID snowflake.ID) (*models.Channel, error) {
-	channelCacheKey := rediskeys.Keys.Channel.Info(channelID)
+	channelCacheKey, cacheBoundedKey := rediskeys.Keys.Channel.Info(channelID)
 	channelBloomKey := bloomFilter.ChannelIDBloomFilter
-	serverBytes, _ := redisDatabase.GlobalCacheManager.Get(ctx, channelCacheKey, &channelBloomKey)
+	bloomItem := channelID.String()
+	serverBytes, _ := redisDatabase.GlobalCacheManager.Get(ctx, cacheBoundedKey, channelCacheKey, &channelBloomKey, &bloomItem)
 	if serverBytes == nil {
 		// Channel does not exist
 		return nil, fmt.Errorf("Channel does not exist")

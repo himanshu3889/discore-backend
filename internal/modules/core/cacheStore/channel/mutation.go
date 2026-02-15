@@ -21,10 +21,11 @@ func CreateChannel(ctx context.Context, channel *models.Channel) error {
 	}
 
 	// async write to cache
-	channelCacheKey := rediskeys.Keys.Channel.Info(channel.ID)
+	channelCacheKey, _ := rediskeys.Keys.Channel.Info(channel.ID)
 	channelBloomKey := bloomFilter.ChannelIDBloomFilter
+	bloomItem := channel.ID.String()
 	go func() {
-		redisDatabase.GlobalCacheManager.Set(ctx, channelCacheKey, &channelBloomKey, channel, 14*24*time.Hour)
+		redisDatabase.GlobalCacheManager.Set(ctx, channelCacheKey, &channelBloomKey, channel, &bloomItem, 14*24*time.Hour)
 	}()
 	return nil
 }
@@ -38,10 +39,11 @@ func UpdateChannelNameType(ctx context.Context, channel *models.Channel) error {
 	}
 
 	// async write to cache
-	channelCacheKey := rediskeys.Keys.Channel.Info(channel.ID)
+	channelCacheKey, _ := rediskeys.Keys.Channel.Info(channel.ID)
 	channelBloomKey := bloomFilter.ChannelIDBloomFilter
+	bloomItem := channel.ID.String()
 	go func() {
-		redisDatabase.GlobalCacheManager.Set(ctx, channelCacheKey, &channelBloomKey, channel, 14*24*time.Hour)
+		redisDatabase.GlobalCacheManager.Set(ctx, channelCacheKey, &channelBloomKey, channel, &bloomItem, 14*24*time.Hour)
 	}()
 	return nil
 }
@@ -55,10 +57,11 @@ func HardDeleteChannelById(ctx context.Context, channelID snowflake.ID) (*models
 	}
 
 	// async write to cache
-	channelCacheKey := rediskeys.Keys.Channel.Info(channel.ID)
+	channelCacheKey, _ := rediskeys.Keys.Channel.Info(channel.ID)
 	channelBloomKey := bloomFilter.ChannelIDBloomFilter
+	bloomItem := channel.ID.String()
 	go func() {
-		redisDatabase.GlobalCacheManager.Set(ctx, channelCacheKey, &channelBloomKey, nil, 2*24*time.Hour)
+		redisDatabase.GlobalCacheManager.Set(ctx, channelCacheKey, &channelBloomKey, nil, &bloomItem, 2*24*time.Hour)
 	}()
 	return channel, nil
 }

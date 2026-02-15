@@ -2,6 +2,7 @@ package websocketApp
 
 import (
 	"discore/configs"
+	baseKafka "discore/internal/base/infrastructure/kafka"
 	"encoding/json"
 	"os"
 	"os/signal"
@@ -24,6 +25,8 @@ func makeChannelBroadcastHandler(hub *Hub) func(*kafka.Message) error {
 			return nil
 		}
 
+		kafkaMetadata := baseKafka.ParseKafkaMessageHeaders(msg)
+
 		msgTopic := "channel-message.add"
 		room := string(msg.Key)
 
@@ -38,9 +41,10 @@ func makeChannelBroadcastHandler(hub *Hub) func(*kafka.Message) error {
 		}
 
 		var socketMessage = &BroadcastRequest{
-			Event: EventType(msgTopic),
-			Room:  room,
-			Data:  rawData,
+			Event:         EventType(msgTopic),
+			Room:          room,
+			Data:          rawData,
+			PipelineStart: kafkaMetadata.IngestTime,
 		}
 
 		select {

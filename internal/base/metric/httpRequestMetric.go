@@ -1,13 +1,13 @@
-package basePrometheus
+package baseMetrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-// Use promauto to safely handle registration
+// HTTP Metrics
 var (
-	PrometheusHttpDuration = promauto.NewHistogramVec(
+	HttpRequestDuration = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "http_request_duration_seconds",
 			Help:    "HTTP request latency distribution",
@@ -16,7 +16,7 @@ var (
 		[]string{"method", "route", "status"},
 	)
 
-	PromotheusHttpRequests = promauto.NewCounterVec(
+	HttpRequestsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "http_requests_total",
 			Help: "Total HTTP requests",
@@ -24,14 +24,3 @@ var (
 		[]string{"method", "route", "status"},
 	)
 )
-
-// var once sync.Once
-
-// // Initialize the prometheus
-// func InitPrometheus() {
-// 	once.Do(func() {
-// 		logrus.Info("Initializing prometheus")
-// 		prometheus.MustRegister(PrometheusHttpDuration, PrometheusHttpRequests)
-// 		logrus.Info("Prometheus initialized")
-// 	})
-// }

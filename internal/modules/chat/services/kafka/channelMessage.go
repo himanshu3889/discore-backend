@@ -6,7 +6,6 @@ import (
 	"discore/internal/modules/chat/models"
 	channelMessageStore "discore/internal/modules/chat/store/channelMessage"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/bwmarrin/snowflake"
@@ -19,32 +18,9 @@ func MakeChannelMessageHandler(producer *baseKafka.KafkaProducer) func(*kafka.Me
 	return func(msg *kafka.Message) error {
 		// logrus.Infof("RAW JSON in channel handler consumer: %s\n", string(msg.Value))
 		metadata := baseKafka.ParseKafkaMessageHeaders(msg)
-		// logrus.Info(metadata)
 
-		createdMessage, err := HandleChannelByteMessage(msg.Value, metadata.ID, metadata.UserID, metadata.Timestamp)
-		if err != nil {
-			return err
-		}
-
-		createdMessageBytes, err := json.Marshal(createdMessage)
-		if err != nil {
-			return fmt.Errorf("marshal failed: %w", err)
-		}
-
-		// Produce to NEXT topic (e.g., "broadcast" or "notifications")
-		broadcastTopic := "broadcast." + msg.Topic
-		err = producer.Send(context.Background(), broadcastTopic,
-			string(msg.Key),
-			createdMessageBytes,
-			metadata.UserID,
-		)
-
-		if err != nil {
-			// logrus.WithError(err).Error("Failed to forward to broadcast topic")
-			return err // Return error so Kafka retries
-		}
-
-		return nil
+		_, err := HandleChannelByteMessage(msg.Value, metadata.TraceID, metadata.UserID, metadata.IngestTime)
+		return err
 	}
 }
 

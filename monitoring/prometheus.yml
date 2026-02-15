@@ -1,6 +1,6 @@
 # Global settings apply to all scrape jobs
 global:
-  # How often Prometheus checks for new metrics (every 15 seconds)
+  # How often Prometheus checks for new metrics
   scrape_interval: 15s
 
 # List of things Prometheus should monitor
@@ -13,24 +13,29 @@ scrape_configs:
       - targets: ['prometheus:9090']
 
   # Job 2: Monitor your API application
-  - job_name: 'discore'
+  - job_name: 'discore-gateway'
     static_configs:
       # Target: your app at 8080 or app container at port 8080
       # This hits the /metrics endpoint automatically
       - targets: ['host.docker.internal:8090'] 
 
-  - job_name: 'redis'
+  - job_name: 'discore-core'
     static_configs:
-      - targets: ['redis-exporter:9121']
+      - targets: ['host.docker.internal:8080']
 
-  - job_name: 'postgres'
-    static_configs:
-      - targets: ['postgres-exporter:9187']
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis-exporter:9121']
 
-  - job_name: 'mongodb'
-    static_configs:
-      - targets: ['mongodb-exporter:9216']
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
 
-  - job_name: 'elasticsearch'
-    static_configs:
-      - targets: ['elasticsearch-exporter:9114']
+  # - job_name: 'mongodb'
+  #   static_configs:
+  #     - targets: ['mongodb-exporter:9216']
+
+  # - job_name: 'elasticsearch'
+  #   static_configs:
+  #     - targets: ['elasticsearch-exporter:9114']
+  

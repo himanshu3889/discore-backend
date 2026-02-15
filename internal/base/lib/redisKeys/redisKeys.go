@@ -9,29 +9,29 @@ import (
 // User
 type userKeys struct{}
 
-func (k userKeys) Info(id snowflake.ID) string {
-	return fmt.Sprintf("discore:user:%d:info", id)
+func (k userKeys) Info(id snowflake.ID) (string, string) {
+	return fmt.Sprintf("discore:user:%d:info", id), "user:id:info" // cacheKey, "entity:operation"
 }
 
 // Server
 type serverKeys struct{}
 
-func (k serverKeys) Info(id snowflake.ID) string {
-	return fmt.Sprintf("discore:server:%d:info", id)
+func (k serverKeys) Info(id snowflake.ID) (string, string) {
+	return fmt.Sprintf("discore:server:%d:info", id), "server:id:info"
 }
 
 // Channel
 type channelKeys struct{}
 
-func (k channelKeys) Info(id snowflake.ID) string {
-	return fmt.Sprintf("discore:channel:%d:info", id)
+func (k channelKeys) Info(id snowflake.ID) (string, string) {
+	return fmt.Sprintf("discore:channel:%d:info", id), "channel:id:info"
 }
 
 // Server Invite
 type serverInviteKeys struct{}
 
-func (k serverInviteKeys) Info(code string) string {
-	return fmt.Sprintf("discore:server_invite:%s:info", code)
+func (k serverInviteKeys) Info(code string) (string, string) {
+	return fmt.Sprintf("discore:server_invite:%s:info", code), "server_invite:code:info"
 }
 
 // Usage

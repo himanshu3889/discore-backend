@@ -58,6 +58,8 @@ func (room *RoomState) flushTyping() {
 		return
 	}
 
+	pipelineStart := time.Now()
+
 	// Grab data quickly, release lock
 	room.typing.mu.Lock()
 	typerIDs := make([]snowflake.ID, 0, len(room.typing.typers))
@@ -97,9 +99,10 @@ func (room *RoomState) flushTyping() {
 	raw := json.RawMessage(data)
 
 	req := &BroadcastRequest{
-		Event: EventRoomTyping,
-		Room:  room.name,
-		Data:  &raw,
+		Event:         EventRoomTyping,
+		Room:          room.name,
+		Data:          &raw,
+		PipelineStart: pipelineStart,
 	}
 
 	// Non-blocking send with timeout

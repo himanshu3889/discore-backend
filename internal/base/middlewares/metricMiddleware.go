@@ -1,31 +1,34 @@
 package baseMiddlewares
 
 import (
-	basePrometheus "discore/internal/base/infrastructure/prometheus"
+	baseMetrics "discore/internal/base/metric"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
-// Metric middleware - records Prometheus metrics only
 func MetricsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-		c.Next()
 
-		duration := time.Since(start)
-		route := c.FullPath()
-		if route == "" {
-			route = "unknown"
+		// Capture these BEFORE c.Next() in case they get modified
+		method := c.Request.Method
+		path := c.FullPath()
+		if path == "" {
+			path = "unknown"
 		}
 
-		status := strconv.Itoa(c.Writer.Status())
+		c.Next()
 
-		// Record metrics - run async so it never blocks response
+		// Now capture status after request is processed
+		status := strconv.Itoa(c.Writer.Status())
+		duration := time.Since(start).Seconds()
+
+		// Record metrics asynchronously
 		go func() {
-			basePrometheus.PrometheusHttpDuration.WithLabelValues(c.Request.Method, route, status).Observe(duration.Seconds())
-			basePrometheus.PromotheusHttpRequests.WithLabelValues(c.Request.Method, route, status).Inc()
+			baseMetrics.HttpRequestDuration.WithLabelValues(method, path, status).Observe(duration)
+			baseMetrics.HttpRequestsTotal.WithLabelValues(method, path, status).Inc()
 		}()
 	}
 }

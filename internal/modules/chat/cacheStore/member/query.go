@@ -14,9 +14,10 @@ import (
 func HasUserServerMember(ctx context.Context, userID snowflake.ID, serverID snowflake.ID) (bool, error) {
 
 	// Validate the server
-	cacheKey := rediskeys.Keys.Server.Info(serverID)
+	cacheKey, cacheBoundedKey := rediskeys.Keys.Server.Info(serverID)
 	bloomKey := bloomFilter.ServerIDBloomFilter
-	serverBytes, _ := redisDatabase.GlobalCacheManager.Get(ctx, cacheKey, &bloomKey)
+	bloomItem := serverID.String()
+	serverBytes, _ := redisDatabase.GlobalCacheManager.Get(ctx, cacheBoundedKey, cacheKey, &bloomKey, &bloomItem)
 
 	if serverBytes == nil {
 		// Server does not exist

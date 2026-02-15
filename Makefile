@@ -44,6 +44,7 @@ down-db:
 up-mon:
 	docker compose --profile monitoring up -d prometheus grafana
 
+# kafka-exporter redis-exporter postgres-exporter mongodb-exporter
 down-mon:
 	docker compose down prometheus grafana
 

@@ -20,11 +20,12 @@ func CreateUser(ctx context.Context, user *models.User) error {
 	}
 
 	// async Set cache
-	cacheKey := rediskeys.Keys.User.Info(user.ID)
+	cacheKey, _ := rediskeys.Keys.User.Info(user.ID)
 	bloomKey := bloomFilter.UserIDBloomFilter
+	bloomItem := user.ID.String()
 
 	go func() {
-		err = redisDatabase.GlobalCacheManager.Set(ctx, cacheKey, &bloomKey, user, 0)
+		err = redisDatabase.GlobalCacheManager.Set(ctx, cacheKey, &bloomKey, user, &bloomItem, 0)
 		if err != nil {
 			// set cache error
 		}

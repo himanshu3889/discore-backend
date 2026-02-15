@@ -24,6 +24,7 @@ const (
 	CoreAddr      = "http://localhost:8080"
 )
 
+// Gateway structure
 type Gateway struct {
 	// Privates ; lowercased
 	engine  *gin.Engine
@@ -31,11 +32,12 @@ type Gateway struct {
 	rdb     *redis.Client
 }
 
-// Get engine
+// Get gateway engine
 func (g *Gateway) GetEngine() *gin.Engine {
 	return g.engine
 }
 
+// New gateway
 func NewGateway() *Gateway {
 	redisDatabase.InitRedis() // Redis initialization
 	redisClient := redisDatabase.RedisClient
@@ -50,6 +52,7 @@ func NewGateway() *Gateway {
 	return g
 }
 
+// Setup gateway routes
 func (g *Gateway) setupRoutes() {
 
 	g.engine.Use(func(c *gin.Context) {
@@ -92,16 +95,18 @@ func (g *Gateway) setupRoutes() {
 // Public routes
 func (g *Gateway) addPublicMiddleware(group *gin.RouterGroup) {
 	group.Use(baseMiddlewares.CORSMiddleware())
+	group.Use(baseMiddlewares.MetricsMiddleware()) // Captures metrics
+	group.Use(baseMiddlewares.LatencyLoggerMiddleware())
 	group.Use(baseMiddlewares.RequestIDMiddleware())
 	group.Use(rateLimitingMiddleware.RateLimitMiddleware(g.limiter))
-	group.Use(baseMiddlewares.LatencyLoggerMiddleware())
 }
 
 // Private routes
 func (g *Gateway) addPrivateMiddleware(group *gin.RouterGroup) {
 	group.Use(baseMiddlewares.CORSMiddleware())
-	group.Use(baseMiddlewares.RequestIDMiddleware())
-	group.Use(authMiddleware.JwtAuthMiddleware(true))
-	group.Use(rateLimitingMiddleware.RateLimitMiddleware(g.limiter))
+	group.Use(baseMiddlewares.MetricsMiddleware()) // Captures metrics
 	group.Use(baseMiddlewares.LatencyLoggerMiddleware())
+	group.Use(authMiddleware.JwtAuthMiddleware(true))
+	group.Use(baseMiddlewares.RequestIDMiddleware())
+	group.Use(rateLimitingMiddleware.RateLimitMiddleware(g.limiter))
 }
