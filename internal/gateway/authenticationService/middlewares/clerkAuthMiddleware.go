@@ -1,10 +1,11 @@
 package middlewares
 
 import (
-	"discore/internal/base/utils"
-	clerkClient "discore/internal/modules/core/clients/clerk"
 	"net/http"
 	"strings"
+
+	clerkClient "github.com/himanshu3889/discore-backend/base/clients/clerk"
+	"github.com/himanshu3889/discore-backend/base/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"

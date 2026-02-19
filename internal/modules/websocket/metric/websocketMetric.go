@@ -50,7 +50,7 @@ var (
 	BroadcastDuration = promauto.NewHistogram(prometheus.HistogramOpts{
 		Name:    "ws_broadcast_duration_seconds",
 		Help:    "Time taken to push a message to all clients in a room",
-		Buckets: []float64{.0001, .0005, .001, .005, .01, .05, .1}, // Focused on sub-millisecond speed
+		Buckets: []float64{.0001, .0005, .001, .005, .01, .05, .1, .2}, // Focused on sub-millisecond speed
 	})
 
 	// Total end-to-end pipeline time (from Kafka consume -> Client receive)

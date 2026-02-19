@@ -1,17 +1,18 @@
 package authentictionApi
 
 import (
-	"discore/configs"
-	accountCacheStore "discore/internal/gateway/authenticationService/cacheStore/account"
-	"discore/internal/gateway/authenticationService/middlewares"
-	"discore/internal/gateway/authenticationService/models"
-	accountStore "discore/internal/gateway/authenticationService/store/account"
+	accountCacheStore "github.com/himanshu3889/discore-backend/base/cacheStore/account"
+	"github.com/himanshu3889/discore-backend/base/models"
+	accountStore "github.com/himanshu3889/discore-backend/base/store/account"
+	"github.com/himanshu3889/discore-backend/configs"
+	"github.com/himanshu3889/discore-backend/internal/gateway/authenticationService/middlewares"
 
-	"discore/internal/gateway/authenticationService/jwtAuthentication"
+	"github.com/himanshu3889/discore-backend/internal/gateway/authenticationService/jwtAuthentication"
 
-	"discore/internal/base/utils"
 	"net/http"
 	"time"
+
+	"github.com/himanshu3889/discore-backend/base/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"

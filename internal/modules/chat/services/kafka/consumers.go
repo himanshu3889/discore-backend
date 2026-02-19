@@ -7,8 +7,8 @@ import (
 	"syscall"
 	"time"
 
-	"discore/configs"
-	baseKafka "discore/internal/base/infrastructure/kafka"
+	baseKafka "github.com/himanshu3889/discore-backend/base/infrastructure/kafka"
+	"github.com/himanshu3889/discore-backend/configs"
 
 	"github.com/sirupsen/logrus"
 )

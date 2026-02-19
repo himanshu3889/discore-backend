@@ -2,11 +2,12 @@ package ChatkafkaService
 
 import (
 	"context"
-	baseKafka "discore/internal/base/infrastructure/kafka"
-	"discore/internal/modules/chat/models"
-	channelMessageStore "discore/internal/modules/chat/store/channelMessage"
 	"encoding/json"
 	"time"
+
+	baseKafka "github.com/himanshu3889/discore-backend/base/infrastructure/kafka"
+	"github.com/himanshu3889/discore-backend/base/models"
+	channelMessageStore "github.com/himanshu3889/discore-backend/base/store/channelMessage"
 
 	"github.com/bwmarrin/snowflake"
 	"github.com/segmentio/kafka-go"

@@ -2,10 +2,11 @@ package directmessageService
 
 import (
 	"context"
-	"discore/internal/base/utils"
-	"discore/internal/modules/websocket/models"
-	directmessage "discore/internal/modules/websocket/store/directMessage"
 	"encoding/json"
+
+	"github.com/himanshu3889/discore-backend/base/models"
+	directmessage "github.com/himanshu3889/discore-backend/base/store/directMessage"
+	"github.com/himanshu3889/discore-backend/base/utils"
 
 	"github.com/bwmarrin/snowflake"
 )

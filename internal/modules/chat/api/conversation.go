@@ -1,12 +1,13 @@
 package chatApi
 
 import (
-	"discore/internal/base/utils"
-	"discore/internal/modules/chat/middlewares"
-	conversationStore "discore/internal/modules/chat/store/conversation"
-	directMessageStore "discore/internal/modules/chat/store/directMessage"
 	"net/http"
 	"strconv"
+
+	"github.com/himanshu3889/discore-backend/base/middlewares"
+	conversationStore "github.com/himanshu3889/discore-backend/base/store/conversation"
+	directMessageStore "github.com/himanshu3889/discore-backend/base/store/directMessage"
+	"github.com/himanshu3889/discore-backend/base/utils"
 
 	"github.com/bwmarrin/snowflake"
 	"github.com/gin-gonic/gin"

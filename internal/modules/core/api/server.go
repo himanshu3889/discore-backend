@@ -1,14 +1,15 @@
 package coreApi
 
 import (
-	"discore/internal/base/utils"
-	channelCacheStore "discore/internal/modules/core/cacheStore/channel"
-	serverCacheStore "discore/internal/modules/core/cacheStore/server"
-	"discore/internal/modules/core/middlewares"
-	"discore/internal/modules/core/models"
-	memberStore "discore/internal/modules/core/store/member"
-	serverStore "discore/internal/modules/core/store/server"
 	"net/http"
+
+	channelCacheStore "github.com/himanshu3889/discore-backend/base/cacheStore/channel"
+	serverCacheStore "github.com/himanshu3889/discore-backend/base/cacheStore/server"
+	"github.com/himanshu3889/discore-backend/base/middlewares"
+	"github.com/himanshu3889/discore-backend/base/models"
+	memberStore "github.com/himanshu3889/discore-backend/base/store/member"
+	serverStore "github.com/himanshu3889/discore-backend/base/store/server"
+	"github.com/himanshu3889/discore-backend/base/utils"
 
 	"github.com/gin-gonic/gin"
 )

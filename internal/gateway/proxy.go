@@ -1,10 +1,11 @@
 package gateway
 
 import (
-	"discore/configs"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+
+	"github.com/himanshu3889/discore-backend/configs"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"

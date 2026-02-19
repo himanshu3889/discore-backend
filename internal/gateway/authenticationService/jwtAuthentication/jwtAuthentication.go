@@ -1,8 +1,9 @@
 package jwtAuthentication
 
 import (
-	"discore/configs"
 	"time"
+
+	"github.com/himanshu3889/discore-backend/configs"
 
 	"github.com/bwmarrin/snowflake"
 	"github.com/golang-jwt/jwt/v5"

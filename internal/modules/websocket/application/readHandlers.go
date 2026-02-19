@@ -1,12 +1,13 @@
 package websocketApp
 
 import (
-	"discore/internal/base/utils"
-	"discore/internal/modules/websocket/models"
-	directmessageService "discore/internal/modules/websocket/services/directMessage"
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/himanshu3889/discore-backend/base/models"
+	"github.com/himanshu3889/discore-backend/base/utils"
+	directmessageService "github.com/himanshu3889/discore-backend/internal/modules/websocket/services/directMessage"
 
 	"github.com/segmentio/kafka-go"
 	"github.com/sirupsen/logrus"

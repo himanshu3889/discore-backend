@@ -1,14 +1,15 @@
 package gateway
 
 import (
-	redisDatabase "discore/internal/base/infrastructure/redis"
-	baseMiddlewares "discore/internal/base/middlewares"
-	"discore/internal/base/utils"
-	authentictionApi "discore/internal/gateway/authenticationService/api"
-	authMiddleware "discore/internal/gateway/authenticationService/middlewares"
-	rateLimitingMiddleware "discore/internal/gateway/rateLimitService/middlewares"
 	"net/http"
 	"runtime/debug"
+
+	redisDatabase "github.com/himanshu3889/discore-backend/base/infrastructure/redis"
+	"github.com/himanshu3889/discore-backend/base/middlewares"
+	"github.com/himanshu3889/discore-backend/base/utils"
+	authentictionApi "github.com/himanshu3889/discore-backend/internal/gateway/authenticationService/api"
+	authMiddleware "github.com/himanshu3889/discore-backend/internal/gateway/authenticationService/middlewares"
+	rateLimitingMiddleware "github.com/himanshu3889/discore-backend/internal/gateway/rateLimitService/middlewares"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis_rate/v10"
@@ -19,9 +20,8 @@ import (
 
 // TODO: USE CONFIG later; Module addresses
 const (
-	ChatAddr      = "http://localhost:8080"
-	WebsocketAddr = "http://localhost:8080"
-	CoreAddr      = "http://localhost:8080"
+	ChatAddr = "http://localhost:8080"
+	CoreAddr = "http://localhost:8080"
 )
 
 // Gateway structure
@@ -86,7 +86,6 @@ func (g *Gateway) setupRoutes() {
 	g.addPrivateMiddleware(private)
 
 	{
-		private.GET("/ws", g.proxyHandler(WebsocketAddr))
 		private.Any("/chat/api/*path", g.proxyHandler(ChatAddr))
 		private.Any("/core/api/*path", g.proxyHandler(CoreAddr))
 	}
@@ -94,19 +93,19 @@ func (g *Gateway) setupRoutes() {
 
 // Public routes
 func (g *Gateway) addPublicMiddleware(group *gin.RouterGroup) {
-	group.Use(baseMiddlewares.CORSMiddleware())
-	group.Use(baseMiddlewares.MetricsMiddleware()) // Captures metrics
-	group.Use(baseMiddlewares.LatencyLoggerMiddleware())
-	group.Use(baseMiddlewares.RequestIDMiddleware())
+	group.Use(middlewares.CORSMiddleware())
+	group.Use(middlewares.MetricsMiddleware()) // Captures metrics
+	group.Use(middlewares.LatencyLoggerMiddleware())
+	group.Use(middlewares.RequestIDMiddleware())
 	group.Use(rateLimitingMiddleware.RateLimitMiddleware(g.limiter))
 }
 
 // Private routes
 func (g *Gateway) addPrivateMiddleware(group *gin.RouterGroup) {
-	group.Use(baseMiddlewares.CORSMiddleware())
-	group.Use(baseMiddlewares.MetricsMiddleware()) // Captures metrics
-	group.Use(baseMiddlewares.LatencyLoggerMiddleware())
+	group.Use(middlewares.CORSMiddleware())
+	group.Use(middlewares.MetricsMiddleware()) // Captures metrics
+	group.Use(middlewares.LatencyLoggerMiddleware())
 	group.Use(authMiddleware.JwtAuthMiddleware(true))
-	group.Use(baseMiddlewares.RequestIDMiddleware())
+	group.Use(middlewares.RequestIDMiddleware())
 	group.Use(rateLimitingMiddleware.RateLimitMiddleware(g.limiter))
 }

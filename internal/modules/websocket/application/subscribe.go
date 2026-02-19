@@ -2,12 +2,13 @@ package websocketApp
 
 import (
 	"context"
-	"discore/internal/base/utils"
-	serverCacheStore "discore/internal/modules/websocket/cacheStore/server"
-	directmessageStore "discore/internal/modules/websocket/store/directMessage"
 	"encoding/json"
 	"strings"
 	"time"
+
+	memberCacheStore "github.com/himanshu3889/discore-backend/base/cacheStore/member"
+	directmessageStore "github.com/himanshu3889/discore-backend/base/store/directMessage"
+	"github.com/himanshu3889/discore-backend/base/utils"
 
 	"github.com/bwmarrin/snowflake"
 	"github.com/gorilla/websocket"
@@ -99,7 +100,7 @@ func (hub *Hub) SubscribeRoom(roomReq *RoomRequest) {
 
 // Check client user join the server room
 func (room *RoomState) canClientInServerRoom(ctx context.Context, userID snowflake.ID, serverID snowflake.ID) bool {
-	canJoin, _ := serverCacheStore.HasUserServerMember(ctx, userID, serverID)
+	canJoin, _ := memberCacheStore.HasUserServerMember(ctx, userID, serverID)
 	return canJoin
 }
 
@@ -110,10 +111,10 @@ func (room *RoomState) canClientInDirectRoom(ctx context.Context, userID snowfla
 }
 
 // Add client in the room safely
-func (room *RoomState) addClient(client *Client, roomName string) {
-	room.mu.Lock()
-	defer room.mu.Unlock()
-	room.clients[client] = true
+func (roomState *RoomState) addClient(client *Client, roomName string) {
+	roomState.mu.Lock()
+	defer roomState.mu.Unlock()
+	roomState.clients[client] = true
 	client.room = roomName
 }
 

@@ -1,14 +1,15 @@
 package websocketApp
 
 import (
-	"discore/configs"
-	baseKafka "discore/internal/base/infrastructure/kafka"
 	"encoding/json"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
+
+	baseKafka "github.com/himanshu3889/discore-backend/base/infrastructure/kafka"
+	"github.com/himanshu3889/discore-backend/configs"
 
 	"github.com/segmentio/kafka-go"
 	"github.com/sirupsen/logrus"

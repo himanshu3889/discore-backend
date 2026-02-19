@@ -3,6 +3,7 @@ package main
 import (
 	"sync"
 
+	"github.com/himanshu3889/discore-backend/servers"
 	"github.com/sirupsen/logrus"
 )
 
@@ -10,8 +11,9 @@ func main() {
 	var wg sync.WaitGroup
 
 	// Create servers
-	moduleServer := NewModuleServer(":8080")
-	gatewayServer := NewGatewayServer(":8090")
+	moduleServer := servers.NewModuleServer(":8080")
+
+	gatewayServer := servers.NewGatewayServer(":8090")
 
 	// Run both servers and wait for them
 	wg.Add(2)
@@ -26,7 +28,7 @@ func main() {
 		gatewayServer.Run()
 	}()
 
-	logrus.Info("Both servers started. Waiting for shutdown signals...")
+	logrus.Info("All servers started. Waiting for shutdown signals...")
 
 	wg.Wait()
 

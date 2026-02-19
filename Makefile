@@ -10,7 +10,7 @@ POSTGRES_PASSWORD=discore
 
 # Migrate commands
 
-MIGRATE = migrate -path internal/modules/core/migrations -database "postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=disable"
+MIGRATE = migrate -path internal/base/migrations/postgres -database "postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=disable"
 
 # (not real files)
 .PHONY: migrate-up migrate-down migrate-version migrate-new
@@ -85,4 +85,7 @@ kafka-grp-describe:
 	$(KAFKA_GROUP_CMD) --describe --group $(group)
 
 
+# GRPC proto builds
+build-proto:
+	protoc --go_out=paths=source_relative:. --go_grpc_out=paths=source_relative:. $(FILE)
 	

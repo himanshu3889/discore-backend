@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package auth;
+
+option go_package = "github.com/himanshu3889/discore-backend/protos/auth";
+
+service AuthService {
+  rpc ValidateAccessToken (ValidateAccessTokenRequest) returns (ValidateAccessTokenResponse);
+}
+
+message ValidateAccessTokenRequest {
+  string token = 1;
+}
+
+message ValidateAccessTokenResponse {
+  int64 userID = 1;
+  string email = 2;
+}

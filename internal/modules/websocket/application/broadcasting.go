@@ -25,11 +25,12 @@ func (hub *Hub) BuildRoomBroadcaster(room string) {
 func (hub *Hub) roomBroadcaster(room string, roomState *RoomState) {
 	// Configuration for the batching window
 	const (
-		batchTimeout = 50 * time.Millisecond // Wait max 50ms
-		maxBatchSize = 50                    // wait for 50 messages
+		batchTimeout    = 50 * time.Millisecond // Wait max 50ms
+		maxBatchSize    = 50                    // wait for 50 messages
+		idleRoomTimeout = 15 * time.Minute
 	)
 
-	removeRoomTicker := time.NewTicker(150 * time.Second)
+	removeRoomTicker := time.NewTicker(idleRoomTimeout)
 	defer removeRoomTicker.Stop()
 
 	flushTicker := time.NewTicker(batchTimeout)
@@ -172,9 +173,22 @@ func (hub *Hub) broadcastBatchRequest(messages []*BroadcastRequest, roomState *R
 	// Lock ONCE for the entire batch
 	roomState.mu.RLock()
 
-	var toRemove []*Client // Collect slow clients
+	// Total count for allocation
+	count := len(roomState.clients)
 
+	clientsSnapshot := make([]*Client, 0, count)
+
+	// Copy pointers only
 	for client := range roomState.clients {
+		clientsSnapshot = append(clientsSnapshot, client)
+	}
+
+	roomState.mu.RUnlock()
+
+	// Optimization: Pre-allocate the dead list. assume 20% will dead atmost
+	toRemove := make([]*Client, 0, count/5)
+
+	for _, client := range clientsSnapshot {
 		select {
 		case client.send <- preparedMsg:
 			// Message queued successfully
@@ -186,10 +200,12 @@ func (hub *Hub) broadcastBatchRequest(messages []*BroadcastRequest, roomState *R
 		}
 	}
 
-	roomState.mu.RUnlock()
-
-	// Remove the clients
-	roomState.RemoveClients(toRemove)
+	// Remove the clients asynchronously
+	if len(toRemove) > 0 {
+		go func(slowClients []*Client) {
+			hub.handleSlowClients(roomState, slowClients)
+		}(toRemove)
+	}
 
 	for _, req := range messages {
 		hub.MetricRecordBroadcast(
@@ -210,6 +226,10 @@ func (hub *Hub) removeRoom(room string) {
 		delete(hub.rooms, room)
 		hub.MetricTrackRoom(false) // Decrease Gauge
 	}
+}
+
+func (hub *Hub) handleSlowClients(roomState *RoomState, clients []*Client) {
+	roomState.RemoveClients(clients)
 }
 
 // Safely remove clients from the room

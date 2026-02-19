@@ -1,8 +1,9 @@
 package websocketApp
 
 import (
-	"discore/configs"
 	"encoding/json"
+
+	"github.com/himanshu3889/discore-backend/configs"
 
 	"github.com/go-redis/redis_rate/v10"
 	"github.com/gorilla/websocket"

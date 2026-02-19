@@ -89,14 +89,23 @@ Every external call (DB, Redis) is wrapped in a Go `context.WithTimeout`.
 - This ensures that if a subsystem stalls, it doesn't cause cascading latency (thread starvation) across the entire platform.
 - Resources are freed immediately when the deadline is exceeded.
 
+### gRPC
+Authentication is handled separately at a different service, so gRPC is used for fast communication between the two services.
+
+
+### REST Api's
+Client services for User, Server, Channel, Member, and Messages.
+
+
 ---
 
 ## 📝 Roadmap (To-Do)
 
 Future improvements planned to enhance scalability and user experience.
 
-* [ ] **Performance Monitoring & Charts** (Prometheus/Grafana)
+* [x] **Performance Monitoring & Charts** (Prometheus/Grafana)
 * [ ] **Elasticsearch Message Search** (Full-text search across message history)
+* [ ] **Mongodb to Scylladb** (Impove the read and write latency of the messages using Scylladb)
 * [ ] **User Online Status & Presence System** (Real-time online/offline/idle tracking)
 * [ ] **Smart Notifications** (Batching `@all` / `@here` mentions to prevent notification storms)
 * [ ] **System Resiliency & Fault Tolerance** (Circuit Breakers)
@@ -118,6 +127,9 @@ Future improvements planned to enhance scalability and user experience.
     ```
 
 2.  **Start Infrastructure:**
+
+    ```Build the env file as the .env.example```
+    
     Spin up Redis, Postgres, MongoDB, and Kafka.
     
     using makerfile
@@ -129,14 +141,38 @@ Future improvements planned to enhance scalability and user experience.
     docker compose up -d postgres mongodb redis kafka
     ```
 
-3.  **Run the Server:**
+    Spin up Prometheus and Grafana.
+    
+    using makerfile
     ```bash
-    go run main.go
+    make up-mon
+    ```
+    or directly with docker compose
+    ```bash
+    docker compose up -d prometheus grafana
+    ```
+
+3.  **Run the Server:**
+    
+    With go run
+    ```bash
+    go run main
+    ```
+
+    With air
+    ```
+    air
     ```
 
 4.  **Connect:**
-    * API running on `:8090`
-    * WebSocket endpoint: `ws://localhost:8090/ws`
+    * Gateway server: http://localhost:8090
+    * Module server: http://localhost:8080
+    * Prometheus: http://localhost:3000/
+    * Grafana: http://localhost:9090/
+
+    ```REST APIs via gateway server: http://localhost:8090```
+    
+    ```WebSocket via module server: ws://localhost:8080/ws```
 
 ---
 

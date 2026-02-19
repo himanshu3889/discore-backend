@@ -1,10 +1,11 @@
 package middlewares
 
 import (
-	"discore/configs"
-	"discore/internal/gateway/authenticationService/middlewares"
 	"net/http"
 	"strconv"
+
+	"github.com/himanshu3889/discore-backend/configs"
+	"github.com/himanshu3889/discore-backend/internal/gateway/authenticationService/middlewares"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis_rate/v10"

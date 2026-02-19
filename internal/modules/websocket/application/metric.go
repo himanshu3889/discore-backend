@@ -1,8 +1,9 @@
 package websocketApp
 
 import (
-	websocketMetrics "discore/internal/modules/websocket/metric"
 	"time"
+
+	websocketMetrics "github.com/himanshu3889/discore-backend/internal/modules/websocket/metric"
 )
 
 // trackConnect updates connection counts

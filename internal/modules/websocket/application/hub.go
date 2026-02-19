@@ -11,14 +11,15 @@ package websocketApp
 
 import (
 	"context"
-	"discore/configs"
-	baseKafka "discore/internal/base/infrastructure/kafka"
-	redisDatabase "discore/internal/base/infrastructure/redis"
 	"encoding/json"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	baseKafka "github.com/himanshu3889/discore-backend/base/infrastructure/kafka"
+	redisDatabase "github.com/himanshu3889/discore-backend/base/infrastructure/redis"
+	"github.com/himanshu3889/discore-backend/configs"
 
 	"github.com/bwmarrin/snowflake"
 	"github.com/go-redis/redis_rate/v10"

@@ -1,10 +1,11 @@
 package websocketApp
 
 import (
-	userCacheStore "discore/internal/modules/websocket/cacheStore/user"
 	"encoding/json"
 	"sync"
 	"time"
+
+	userCacheStore "github.com/himanshu3889/discore-backend/base/cacheStore/user"
 
 	"github.com/bwmarrin/snowflake"
 	"golang.org/x/net/context"

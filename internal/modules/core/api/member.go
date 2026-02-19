@@ -1,11 +1,12 @@
 package coreApi
 
 import (
-	"discore/internal/base/utils"
-	"discore/internal/modules/core/middlewares"
+	"github.com/himanshu3889/discore-backend/base/middlewares"
+	"github.com/himanshu3889/discore-backend/base/utils"
 
-	memberStore "discore/internal/modules/core/store/member"
 	"net/http"
+
+	serverStore "github.com/himanshu3889/discore-backend/base/store/server"
 
 	"github.com/gin-gonic/gin"
 )
@@ -39,7 +40,7 @@ func GetUserServerMember(ctx *gin.Context) {
 		return
 	}
 
-	member, err := memberStore.GetUserServerMemember(ctx, userID, serverSnowID)
+	member, err := serverStore.GetUserServerMemember(ctx, userID, serverSnowID)
 	if err != nil {
 		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
 		return
@@ -67,7 +68,7 @@ func GetUserServerMemberProfile(ctx *gin.Context) {
 	}
 
 	// Check first if user is the member in the server or not
-	member, err := memberStore.GetUserServerMemember(ctx, userID, serverSnowID)
+	member, err := serverStore.GetUserServerMemember(ctx, userID, serverSnowID)
 	if err != nil {
 		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
 		return

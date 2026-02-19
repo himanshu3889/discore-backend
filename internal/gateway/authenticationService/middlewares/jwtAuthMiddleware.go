@@ -1,14 +1,14 @@
 package middlewares
 
 import (
-	"discore/configs"
-	"discore/internal/base/lib/passport"
-	"discore/internal/base/utils"
-	"discore/internal/gateway/authenticationService/jwtAuthentication"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/himanshu3889/discore-backend/base/lib/passport"
+	"github.com/himanshu3889/discore-backend/base/utils"
+	"github.com/himanshu3889/discore-backend/configs"
+	"github.com/himanshu3889/discore-backend/internal/gateway/authenticationService/jwtAuthentication"
 
 	"github.com/bwmarrin/snowflake"
 	"github.com/gin-gonic/gin"
@@ -33,15 +33,6 @@ func JwtAuthMiddleware(externalService bool, allowedRoles ...string) gin.Handler
 		ctx.Request.Header.Del("X-User-Email")
 
 		authHeader := ctx.GetHeader("Authorization")
-
-		// Extra layer specially for the websockets
-		//TODO: (wrong method) If authorization not provide check for the cookie
-		if authHeader == "" {
-			cookie, err := ctx.Cookie("accessToken")
-			if err == nil {
-				authHeader = fmt.Sprintf("Bearer %s", cookie)
-			}
-		}
 
 		if authHeader == "" {
 			utils.RespondWithError(ctx, http.StatusUnauthorized, "Missing Token")

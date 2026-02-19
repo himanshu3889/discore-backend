@@ -1,11 +1,11 @@
 package websocketApp
 
 import (
-	"discore/internal/modules/core/middlewares"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/himanshu3889/discore-backend/internal/modules/websocket/middlewares"
 	"github.com/sirupsen/logrus"
 )
 
@@ -22,7 +22,7 @@ var upgrader = websocket.Upgrader{
 
 // handles WebSocket requests for connections.
 func WsHandler(ctx *gin.Context) {
-	userID, _, isOk := middlewares.GetContextUserIDEmail(ctx)
+	userID, _, isOk := middlewares.GetWsContextUserIDEmail(ctx)
 	if !isOk {
 		logrus.Error("Invalid userID")
 		return
