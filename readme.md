@@ -45,6 +45,38 @@ Redis serves three distinct roles:
 
 ---
 
+### Why Prometheus?
+
+Prometheus handles the **"Is my backend healthy?"** problem.
+
+- **The Problem:** Your Discord backend has WebSocket connections, message handlers, and API endpoints. When users report lag or dropped messages, you don't know if it's high CPU, memory leaks, or goroutine spikes. You're blind to performance until someone complains.
+
+- **The Solution:** Prometheus scrapes metrics from your Go backend every 15 seconds. You track goroutine count, memory usage, WebSocket connection count, message throughput, and API latency. When message delivery slows down, you see exactly if it's a resource bottleneck or a handler issue.
+
+---
+
+### Why Grafana?
+
+Grafana serves three distinct roles:
+
+1. **Live Dashboards:** Turns Prometheus metrics into real-time charts showing active WebSocket connections, messages per second, and API response times. You see your Discord backend health at a glance.
+
+2. **Alert Notifications:** Sends Discord/Slack alerts when WebSocket connections drop suddenly or memory usage spikes. You catch issues before users notice lag.
+
+3. **Query Interface:** Lets you explore metrics with PromQL. When investigating slow message delivery, you filter by handler, time range, or specific channels without writing code.
+
+---
+
+### Why Loki?
+
+Loki handles the **"Find that error in my WebSocket handler logs"** problem.
+
+- **The Problem:** Your backend generates logs for connection events, message processing, and errors. When a user reports a failed message send, searching through log files with `grep` is slow. Storing everything in a heavy search engine costs too much for a side project.
+
+- **The Solution:** Loki only indexes labels like service name, log level, or handler type—not every word. You filter by `handler=websocket` and `level=error` first, then search content. Storage stays cheap and you still find that connection timeout error fast. Works directly with Grafana so you click from a metric spike to the exact log lines that caused it.
+
+---
+
 ## 🛠 Deep Dive - Engineering Patterns
 
 ### Rate Limiting (Token Bucket)
@@ -149,26 +181,35 @@ Future improvements planned to enhance scalability and user experience.
     ```
     or directly with docker compose
     ```bash
-    docker compose up -d prometheus grafana
+    docker compose up -d prometheus grafana loki
     ```
 
 3.  **Run the Server:**
     
     With go run
     ```bash
-    go run main
+    go run cmd/gateway/main.go
+    go run cmd/modules/main.go
     ```
 
     With air
     ```
-    air
+    air -c .air.gateway.toml
+    air -c .air.modules.toml
+    ```
+
+    with maker command
+    ```
+    make air-gateway
+    make air-modules
     ```
 
 4.  **Connect:**
     * Gateway server: http://localhost:8090
     * Module server: http://localhost:8080
-    * Prometheus: http://localhost:3000/
-    * Grafana: http://localhost:9090/
+    * Prometheus: http://localhost:3000
+    * Grafana: http://localhost:9090
+    * Loki: http://localhost:3100
 
     ```REST APIs via gateway server: http://localhost:8090```
     
