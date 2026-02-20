@@ -11,9 +11,11 @@ import (
 // Config mirrors every env-var exactly; all public. so if any error can check using os.GetEnv()
 type config struct {
 	// App
+	APP_NAME   string
 	APP_PORT   int
 	LOG_LEVEL  string
 	MACHINE_ID int
+	ENV        string
 
 	// Authentication
 	JWT_SECRET               string
@@ -50,6 +52,9 @@ type config struct {
 	KAFKA_HOST    string
 	KAFKA_PORT    string
 	KAFKA_BROKERS string
+
+	// Loki
+	LOKI_URL string
 
 	// Elasticsearch
 	ELASTICSEARCH_HOST     string

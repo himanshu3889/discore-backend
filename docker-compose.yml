@@ -251,7 +251,9 @@ services:
     image: grafana/loki:latest
     container_name: discore-loki
     ports: ["3100:3100"]
-    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./monitoring/loki.yml:/etc/loki/loki.yml 
+      - loki_data:/loki
     networks: [discore-net]
     profiles: [monitoring]
 
@@ -305,9 +307,10 @@ volumes:
   mongodb_data: 
   redis_data:
   elasticsearch_data:
+  kafka_data:
   prometheus_data:
   grafana_data:
-  kafka_data:
+  loki_data:
   
 
 networks:

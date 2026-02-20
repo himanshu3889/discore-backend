@@ -43,7 +43,7 @@ func NewModuleServer(addr string) *ModuleServer {
 
 func (s *ModuleServer) Initialize() {
 	configs.InitializeConfigs()
-	logrus.SetFormatter(&utils.LogrusColorFormatter{})
+	// logrus.SetFormatter(&utils.LogrusColorFormatter{})
 
 	router := gin.New()
 	router.Use(middlewares.MetricsMiddleware()) // Captures metrics

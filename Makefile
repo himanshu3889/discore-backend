@@ -42,11 +42,11 @@ down-db:
 	docker compose down postgres mongodb redis
 
 up-mon:
-	docker compose --profile monitoring up -d prometheus grafana
+	docker compose --profile monitoring up -d prometheus grafana loki
 
 # kafka-exporter redis-exporter postgres-exporter mongodb-exporter
 down-mon:
-	docker compose down prometheus grafana
+	docker compose down prometheus grafana loki
 
 up-sys:
 	docker compose up -d postgres mongodb redis kafka
@@ -89,3 +89,9 @@ kafka-grp-describe:
 build-proto:
 	protoc --go_out=paths=source_relative:. --go_grpc_out=paths=source_relative:. $(FILE)
 	
+
+air-gateway:
+	air -c .air.gateway.toml
+
+air-modules:
+	air -c .air.modules.toml

@@ -5,7 +5,6 @@ import (
 
 	"github.com/himanshu3889/discore-backend/base/databases"
 	redisDatabase "github.com/himanshu3889/discore-backend/base/infrastructure/redis"
-	"github.com/himanshu3889/discore-backend/base/utils"
 	"github.com/himanshu3889/discore-backend/configs"
 	"github.com/himanshu3889/discore-backend/internal/gateway"
 	authGrpc "github.com/himanshu3889/discore-backend/internal/gateway/authenticationService/grpc"
@@ -27,7 +26,7 @@ func NewGatewayServer(addr string) *GatewayServer {
 
 func (s *GatewayServer) Initialize() *serverUtils.UnifiedServer {
 	configs.InitializeConfigs()
-	logrus.SetFormatter(&utils.LogrusColorFormatter{})
+	// logrus.SetFormatter(&utils.LogrusColorFormatter{})
 
 	redisDatabase.InitRedis()
 	database.InitPostgresDB()
@@ -44,16 +43,14 @@ func (s *GatewayServer) Initialize() *serverUtils.UnifiedServer {
 func (s *GatewayServer) Run() {
 	gatewayServer := s.Initialize()
 
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logrus.Errorf("Panic recovered in gateway server: %v", r)
-				// restart or handle gracefully
-			}
-		}()
-
-		if err := gatewayServer.Run(); err != nil && err != http.ErrServerClosed {
-			logrus.Fatalf("Gateway server error: %s", err)
+	defer func() {
+		if r := recover(); r != nil {
+			logrus.Errorf("Panic recovered in gateway server: %v", r)
+			// restart or handle gracefully
 		}
 	}()
+
+	if err := gatewayServer.Run(); err != nil && err != http.ErrServerClosed {
+		logrus.Fatalf("Gateway server error: %s", err)
+	}
 }
