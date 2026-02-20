@@ -69,11 +69,9 @@ func (s *ModuleServer) Initialize() {
 	clerkClient.InitializeClerk()
 	database.InitPostgresDB()
 	database.InitMongoDB()
-	database.InitPostgresDB()
-	database.InitMongoDB()
-	database.InitPostgresDB()
-	websocketApp.InitializeHub(context.Background())
 	redisDatabase.InitRedis()
+
+	websocketApp.InitializeHub(context.Background())
 
 	// Set the app modules app state
 	// Connect to authentication server using grpc

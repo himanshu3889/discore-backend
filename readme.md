@@ -173,7 +173,7 @@ Future improvements planned to enhance scalability and user experience.
     docker compose up -d postgres mongodb redis kafka
     ```
 
-    Spin up Prometheus and Grafana.
+    Spin up Prometheus, Grafana and Loki.
     
     using makerfile
     ```bash

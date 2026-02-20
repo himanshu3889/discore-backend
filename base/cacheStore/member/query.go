@@ -13,7 +13,6 @@ import (
 
 // Has user member of server; check the server in cache
 func HasUserServerMember(ctx context.Context, userID snowflake.ID, serverID snowflake.ID) (bool, error) {
-	return true, nil
 	// Validate the server
 	cacheKey, cacheBoundedKey := rediskeys.Keys.Server.Info(serverID)
 	bloomKey := bloomFilter.ServerIDBloomFilter

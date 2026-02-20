@@ -5,6 +5,7 @@ import (
 
 	"github.com/himanshu3889/discore-backend/base/databases"
 	redisDatabase "github.com/himanshu3889/discore-backend/base/infrastructure/redis"
+	"github.com/himanshu3889/discore-backend/base/utils"
 	"github.com/himanshu3889/discore-backend/configs"
 	"github.com/himanshu3889/discore-backend/internal/gateway"
 	authGrpc "github.com/himanshu3889/discore-backend/internal/gateway/authenticationService/grpc"
@@ -28,6 +29,7 @@ func (s *GatewayServer) Initialize() *serverUtils.UnifiedServer {
 	configs.InitializeConfigs()
 	// logrus.SetFormatter(&utils.LogrusColorFormatter{})
 
+	utils.InitSnowflake(1) // machineID = 1
 	redisDatabase.InitRedis()
 	database.InitPostgresDB()
 
