@@ -2,6 +2,7 @@ package memberCacheStore
 
 import (
 	"context"
+	"time"
 
 	redisDatabase "github.com/himanshu3889/discore-backend/base/infrastructure/redis"
 	"github.com/himanshu3889/discore-backend/base/infrastructure/redis/bloomFilter"
@@ -17,11 +18,18 @@ func HasUserServerMember(ctx context.Context, userID snowflake.ID, serverID snow
 	cacheKey, cacheBoundedKey := rediskeys.Keys.Server.Info(serverID)
 	bloomKey := bloomFilter.ServerIDBloomFilter
 	bloomItem := serverID.String()
-	serverBytes, _ := redisDatabase.GlobalCacheManager.Get(ctx, cacheBoundedKey, cacheKey, &bloomKey, &bloomItem)
-
-	if serverBytes == nil {
-		// Server does not exist
+	serverBytes, err := redisDatabase.GlobalCacheManager.Get(ctx, cacheBoundedKey, cacheKey, &bloomKey, &bloomItem)
+	if serverBytes == nil && err == nil {
+		// Server does not exists
 		return false, nil
+	}
+
+	if err != nil {
+		server, err := serverStore.GetServerByID(ctx, serverID)
+		if err != nil {
+			return false, err
+		}
+		redisDatabase.GlobalCacheManager.Set(ctx, cacheKey, &bloomKey, server, &bloomItem, 30*24*time.Hour)
 	}
 
 	return serverStore.HasUserServerMember(ctx, userID, serverID)

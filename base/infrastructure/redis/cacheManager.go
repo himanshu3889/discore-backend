@@ -184,6 +184,26 @@ func (cm *CacheManager) MGet(ctx context.Context, boundedKey string, cacheKeys [
 	return result, nil
 }
 
+// scripts must run independently for every caller.
+func (cm *CacheManager) RunScript(ctx context.Context, boundedKey string, script *redis.Script, keys []string, args ...interface{}) (interface{}, error) {
+	start := time.Now()
+
+	// script.Run automatically handles EVAL vs EVALSHA caching in go-redis
+	result, err := script.Run(ctx, cm.client, keys, args...).Result()
+
+	// Record the metric using the same pattern as Get
+	cm.recordMetric(boundedKey, err, false, time.Since(start))
+
+	if err != nil {
+		if err == redis.Nil {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return result, nil
+}
+
 // recordMetric internal helper to update Prometheus
 func (cm *CacheManager) recordMultiGetMetric(metricKey string, hits int, misses int, duration time.Duration) {
 	if metricKey == "" {

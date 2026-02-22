@@ -339,8 +339,7 @@ func AcceptServerInvite(ctx *gin.Context) {
 
 	serverInvite, err := serverCacheStore.AcceptServerInviteAndCreateMember(ctx, userID, incomingServerInvite.Code)
 	if err != nil {
-		// logrus.WithError(err).Error("Unable to accept")
-		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
+		utils.RespondWithError(ctx, http.StatusInternalServerError, "Unable to accept server invite")
 		return
 	}
 	utils.RespondWithSuccess(ctx, http.StatusOK, gin.H{

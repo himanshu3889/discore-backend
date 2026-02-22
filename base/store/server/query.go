@@ -8,10 +8,47 @@ import (
 
 	"github.com/himanshu3889/discore-backend/base/databases"
 	"github.com/himanshu3889/discore-backend/base/models"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/bwmarrin/snowflake"
 	"github.com/sirupsen/logrus"
 )
+
+var serverGroup singleflight.Group
+
+// Get server by the id
+func GetServerByID(ctx context.Context, serverID snowflake.ID) (*models.Server, error) {
+	// Create a unique key for this specific server ID
+	requestKey := fmt.Sprintf("get_server_%d", serverID)
+
+	// ensures only one execution for this key happens at a time
+	val, err, shared := serverGroup.Do(requestKey, func() (interface{}, error) {
+		const query = `SELECT * FROM servers WHERE id = $1`
+
+		var server models.Server
+		dbErr := database.PostgresDB.GetContext(ctx, &server, query, serverID)
+
+		if dbErr != nil {
+			logrus.WithFields(logrus.Fields{
+				"server_id": serverID,
+			}).WithError(dbErr).Error("Database error during server lookup")
+			return nil, dbErr
+		}
+
+		return &server, nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch server: %w", err)
+	}
+
+	// see if singleflight is actually working
+	if shared {
+		logrus.Debugf("Singleflight: Shared result for server %d", serverID)
+	}
+
+	return val.(*models.Server), nil
+}
 
 // Get the user own servers; Max limit is 10
 func UserJoinedServers(ctx context.Context, user_id snowflake.ID) ([]*models.Server, error) {
@@ -267,7 +304,6 @@ func GetUserServerMemember(ctx context.Context, userID snowflake.ID, serverID sn
 
 // Has user is member of the server
 func HasUserServerMember(ctx context.Context, userID snowflake.ID, serverID snowflake.ID) (bool, error) {
-	return true, nil
 	const query = `SELECT EXISTS(SELECT 1
 								from members
 								where user_id = $1 AND server_id = $2)
@@ -283,7 +319,7 @@ func HasUserServerMember(ctx context.Context, userID snowflake.ID, serverID snow
 			"user_id":   userID,
 			"server_id": serverID,
 		}).WithError(err).Error("Database error during checking")
-		return false, fmt.Errorf("Failed to check user own any servers")
+		return false, fmt.Errorf("Failed to check has member of server")
 	}
 	return exists, nil
 

@@ -34,6 +34,14 @@ func (k serverInviteKeys) Info(code string) (string, string) {
 	return fmt.Sprintf("discore:server_invite:%s:info", code), "server_invite:code:info"
 }
 
+func (k serverInviteKeys) UsedCount(code string) (string, string) {
+	return fmt.Sprintf("discore:server_invite:%s:used_count", code), "server_invite:code:used_count"
+}
+
+func (k serverInviteKeys) UseCountLuaScript() string {
+	return "server_invite:used_count:lua_script"
+}
+
 // Usage
 var Keys = struct {
 	User         userKeys
