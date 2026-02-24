@@ -1,6 +1,8 @@
 package authentictionApi
 
 import (
+	"errors"
+
 	accountCacheStore "github.com/himanshu3889/discore-backend/base/cacheStore/account"
 	"github.com/himanshu3889/discore-backend/base/models"
 	accountStore "github.com/himanshu3889/discore-backend/base/store/account"
@@ -92,9 +94,9 @@ func genererateUserSession(ctx *gin.Context, user *models.User) (sess *models.Us
 
 	session := buildSessionFromMetadata(ctx, refreshToken)
 	session.UserID = user.ID
-	err = accountStore.CreateSession(ctx, session)
-	if err != nil {
-		return nil, "", "", err
+	appErr := accountStore.CreateSession(ctx, session)
+	if appErr != nil {
+		return nil, "", "", errors.New(appErr.Message)
 	}
 
 	// Set new cookies
@@ -127,9 +129,9 @@ func createUserHelper(ctx *gin.Context, incomingUser *models.User) {
 	}
 
 	// Create account
-	err = accountCacheStore.CreateUser(ctx, createdUser)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
+	appErr := accountCacheStore.CreateUser(ctx, createdUser)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 
@@ -174,9 +176,9 @@ func SignIn(ctx *gin.Context) {
 	}
 
 	// Find user in DB by email
-	user, err := accountStore.GetUserByEmail(ctx, incomingUser.Email)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusNotFound, "User not found")
+	user, appErr := accountStore.GetUserByEmail(ctx, incomingUser.Email)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 
@@ -221,17 +223,17 @@ func Signout(c *gin.Context) {
 
 	claims, claimsOk := token.Claims.(*jwtAuthentication.JwtClaims)
 
-	user, err := accountStore.GetUserByEmail(c, claims.Email)
-	if err != nil {
-		utils.RespondWithError(c, http.StatusInternalServerError, err.Error())
+	user, appErr := accountStore.GetUserByEmail(c, claims.Email)
+	if appErr != nil {
+		utils.RespondWithError(c, int(appErr.Code), appErr.Message)
 		return
 	}
 
 	if claimsOk && token.Valid {
 		// Remove refresh token from database
-		err = accountStore.DeleteUserSession(c, user.ID, refreshToken)
-		if err != nil {
-			utils.RespondWithError(c, http.StatusInternalServerError, err.Error())
+		appErr = accountStore.DeleteUserSession(c, user.ID, refreshToken)
+		if appErr != nil {
+			utils.RespondWithError(c, int(appErr.Code), appErr.Message)
 			return
 		}
 	}
@@ -271,16 +273,16 @@ func GetAccessTokenFromRefresh(c *gin.Context) {
 	}
 
 	// Check if user exists in database and matches
-	user, err := accountStore.GetUserByEmail(c, refreshTokenClaims.Email)
-	if err != nil {
-		utils.RespondWithError(c, http.StatusBadRequest, "User not found!")
+	user, appErr := accountStore.GetUserByEmail(c, refreshTokenClaims.Email)
+	if appErr != nil {
+		utils.RespondWithError(c, int(appErr.Code), appErr.Message)
 		return
 	}
 
 	// Check refreshToken exist or not
-	_, err = accountStore.GetUserSessionByToken(c, user.ID, refreshToken)
-	if err != nil {
-		utils.RespondWithError(c, http.StatusInternalServerError, err.Error())
+	_, appErr = accountStore.GetUserSessionByToken(c, user.ID, refreshToken)
+	if appErr != nil {
+		utils.RespondWithError(c, int(appErr.Code), appErr.Message)
 		// return
 	}
 
@@ -321,10 +323,10 @@ func ClerkSigninSignup(ctx *gin.Context) {
 	}
 
 	// First check if user exist or not
-	user, err := accountStore.GetUserByEmail(ctx, incomingUser.Email)
+	user, appErr := accountStore.GetUserByEmail(ctx, incomingUser.Email)
 
 	// If user not found then create user
-	if err != nil {
+	if appErr != nil {
 		// Generate random password and store in context
 		randomPassword := utils.GenerateSnowflakeID().String()
 		incomingUser.Password = randomPassword

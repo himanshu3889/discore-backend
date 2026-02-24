@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	database "github.com/himanshu3889/discore-backend/base/databases"
+	"github.com/himanshu3889/discore-backend/base/lib/appError"
 	"github.com/himanshu3889/discore-backend/base/models"
 	userStore "github.com/himanshu3889/discore-backend/base/store/user"
 
@@ -16,7 +17,7 @@ import (
 )
 
 // Get channel last messages
-func GetConversationLastMessages(ctx context.Context, conversationID snowflake.ID, limit int64, afterID *snowflake.ID) ([]*models.DirectMessage, error) {
+func GetConversationLastMessages(ctx context.Context, conversationID snowflake.ID, limit int64, afterID *snowflake.ID) ([]*models.DirectMessage, *appError.Error) {
 	// Cap the limit
 	if limit > 100 {
 		limit = 100
@@ -42,14 +43,14 @@ func GetConversationLastMessages(ctx context.Context, conversationID snowflake.I
 			"conversation_id": conversationID,
 			"limit":           limit,
 		}).WithError(err).Error("Failed to fetch direct messages from database")
-		return nil, err
+		return nil, appError.NewInternal("Failed to fetch direct messages")
 	}
 
 	defer cursor.Close(ctx)
 
 	var messages []*models.DirectMessage
 	if err = cursor.All(ctx, &messages); err != nil {
-		return nil, err
+		return nil, appError.NewInternal("Failed to fetch direct messages")
 	}
 
 	if len(messages) == 0 {
@@ -68,12 +69,12 @@ func GetConversationLastMessages(ctx context.Context, conversationID snowflake.I
 	}
 
 	// Batch fetch users
-	usersMap, err := userStore.GetUsersBatch(ctx, userIDs)
-	if err != nil {
+	usersMap, appErr := userStore.GetUsersBatch(ctx, userIDs)
+	if appErr != nil {
 		logrus.WithFields(logrus.Fields{
 			"conversation_id": conversationID,
 			"user_ids":        userIDs,
-		}).WithError(err).Warn("Failed to fetch users batch - messages will not include author data")
+		}).WithError(errors.New(appErr.Message)).Warn("Failed to fetch users batch")
 		// Continue without authors rather than failing completely
 	}
 
@@ -88,10 +89,10 @@ func GetConversationLastMessages(ctx context.Context, conversationID snowflake.I
 }
 
 // conversation is valid only if the user is a participant
-func HasValidConversationForUser(ctx context.Context, conversationID, userID snowflake.ID) (bool, error) {
+func HasValidConversationForUser(ctx context.Context, conversationID, userID snowflake.ID) (bool, *appError.Error) {
 	if conversationID == 0 || userID == 0 {
 		logrus.Error("Conversation ID and User ID are required")
-		return false, errors.New("conversation ID and user ID are required")
+		return false, appError.NewBadRequest("conversation ID and user ID are required")
 	}
 
 	query := `
@@ -112,7 +113,7 @@ func HasValidConversationForUser(ctx context.Context, conversationID, userID sno
 			"conversation_id": conversationID,
 			"user_id":         userID,
 		}).WithError(err).Error("Failed to fetch conversation for user")
-		return false, errors.New("failed to fetch conversation")
+		return false, appError.NewInternal("failed to fetch conversation")
 	}
 
 	return valid, nil

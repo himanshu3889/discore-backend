@@ -2,9 +2,9 @@ package memberStore
 
 import (
 	"context"
-	"errors"
 
 	"github.com/himanshu3889/discore-backend/base/databases"
+	"github.com/himanshu3889/discore-backend/base/lib/appError"
 	"github.com/himanshu3889/discore-backend/base/models"
 	"github.com/himanshu3889/discore-backend/base/utils"
 
@@ -12,7 +12,7 @@ import (
 )
 
 // Create member in the server
-func CreateMember(ctx context.Context, member *models.Member) error {
+func CreateMember(ctx context.Context, member *models.Member) *appError.Error {
 	const query = `INSERT INTO members 
 				(id, role, user_id, server_id, created_at, updated_at) 
 				values ($1, $2, $3, $4, NOW(), NOW()) 
@@ -32,7 +32,7 @@ func CreateMember(ctx context.Context, member *models.Member) error {
 			"server_id": member.ServerID,
 			"user_id":   member.UserID,
 		}).WithError(err).Error("Failed to create member in database")
-		return errors.New("Failed to create member for server")
+		return appError.NewInternal("Failed to create member for server")
 	}
 	return nil
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/himanshu3889/discore-backend/base/databases"
+	"github.com/himanshu3889/discore-backend/base/lib/appError"
 	"github.com/himanshu3889/discore-backend/base/models"
 	"golang.org/x/sync/singleflight"
 
@@ -17,7 +18,7 @@ import (
 var serverGroup singleflight.Group
 
 // Get server by the id
-func GetServerByID(ctx context.Context, serverID snowflake.ID) (*models.Server, error) {
+func GetServerByID(ctx context.Context, serverID snowflake.ID) (*models.Server, *appError.Error) {
 	// Create a unique key for this specific server ID
 	requestKey := fmt.Sprintf("get_server_%d", serverID)
 
@@ -39,7 +40,7 @@ func GetServerByID(ctx context.Context, serverID snowflake.ID) (*models.Server, 
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch server: %w", err)
+		return nil, appError.NewInternal(fmt.Sprintf("failed to fetch server: %v", err))
 	}
 
 	// see if singleflight is actually working
@@ -51,7 +52,7 @@ func GetServerByID(ctx context.Context, serverID snowflake.ID) (*models.Server, 
 }
 
 // Get the user own servers; Max limit is 10
-func UserJoinedServers(ctx context.Context, user_id snowflake.ID) ([]*models.Server, error) {
+func UserJoinedServers(ctx context.Context, user_id snowflake.ID) ([]*models.Server, *appError.Error) {
 	const query = `
         SELECT s.*
         FROM members m
@@ -63,19 +64,19 @@ func UserJoinedServers(ctx context.Context, user_id snowflake.ID) ([]*models.Ser
 	err := database.PostgresDB.SelectContext(ctx, &servers, query, user_id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return []*models.Server{}, nil // No server found, return nil without error
+			return []*models.Server{}, nil // FIXME: No server found, return nil without error
 		}
 		logrus.WithFields(logrus.Fields{
 			"user_id": user_id,
 		}).WithError(err).Errorf("Failed to find user servers on database")
-		return servers, errors.New("failed to find user servers")
+		return servers, appError.NewInternal("failed to find user servers")
 	}
 	return servers, nil
 
 }
 
 // Returns both server and member for user
-func GetServerMembershipForUser(ctx context.Context, serverID snowflake.ID, userID snowflake.ID) (*models.Server, *models.Member, error) {
+func GetServerMembershipForUser(ctx context.Context, serverID snowflake.ID, userID snowflake.ID) (*models.Server, *models.Member, *appError.Error) {
 	const query = `
 		SELECT s.*,
 		       m.id AS "member.id",
@@ -99,20 +100,20 @@ func GetServerMembershipForUser(ctx context.Context, serverID snowflake.ID, user
 	err := database.PostgresDB.GetContext(ctx, &dest, query, serverID, userID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil, nil
+			return nil, nil, nil // FIXME: return 404 code error
 		}
 		logrus.WithFields(logrus.Fields{
 			"server_id": serverID,
 			"user_id":   userID,
 		}).WithError(err).Error("Failed to find server with membership")
-		return nil, nil, errors.New("failed to find server")
+		return nil, nil, appError.NewInternal("failed to find server")
 	}
 
 	return &dest.Server, &dest.Member, nil
 }
 
 // Get user first server
-func UserFirstJoinedServer(ctx context.Context, user_id snowflake.ID) (*models.Server, error) {
+func UserFirstJoinedServer(ctx context.Context, user_id snowflake.ID) (*models.Server, *appError.Error) {
 	const query = `
         SELECT s.*
         FROM members m
@@ -124,19 +125,19 @@ func UserFirstJoinedServer(ctx context.Context, user_id snowflake.ID) (*models.S
 	err := database.PostgresDB.GetContext(ctx, &server, query, user_id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil // No server found, return nil without error
+			return nil, nil // FIXME: return 404 error
 		}
 		logrus.WithFields(logrus.Fields{
 			"user_id": user_id,
 		}).WithError(err).Errorf("Failed to find user joined server on database")
-		return &server, errors.New("failed to find user joined server")
+		return &server, appError.NewInternal("failed to find user joined server")
 	}
 	return &server, nil
 
 }
 
 // Check if user own any server or not
-func HasUserOwnAnyServer(ctx context.Context, user_id snowflake.ID) (bool, error) {
+func HasUserOwnAnyServer(ctx context.Context, user_id snowflake.ID) (bool, *appError.Error) {
 	const query = `SELECT EXISTS(SELECT 1 FROM servers WHERE owner_id = $1)`
 	var exists bool
 	err := database.PostgresDB.GetContext(ctx, &exists, query, user_id)
@@ -144,14 +145,14 @@ func HasUserOwnAnyServer(ctx context.Context, user_id snowflake.ID) (bool, error
 		logrus.WithFields(logrus.Fields{
 			"user_id": user_id,
 		}).WithError(err).Error("Database error during checking")
-		return false, fmt.Errorf("Failed to check user own any servers")
+		return false, appError.NewInternal("Failed to check user own any servers")
 	}
 	return exists, nil
 
 }
 
 // Check if user own server or not
-func HasUserOwnServer(ctx context.Context, userID snowflake.ID, serverID snowflake.ID) (bool, error) {
+func HasUserOwnServer(ctx context.Context, userID snowflake.ID, serverID snowflake.ID) (bool, *appError.Error) {
 	const query = `SELECT EXISTS(SELECT 1 FROM servers WHERE id=$1 AND owner_id=$2)`
 
 	var ok bool
@@ -165,14 +166,14 @@ func HasUserOwnServer(ctx context.Context, userID snowflake.ID, serverID snowfla
 			"user_id":   userID,
 			"server_id": serverID,
 		}).WithError(err).Error("Database error during checking user own server")
-		return false, fmt.Errorf("failed to check user servers")
+		return false, appError.NewInternal("failed to check user servers")
 	}
 	return ok, nil
 
 }
 
 // Retrieves server channels
-func GetServerChannels(ctx context.Context, serverId snowflake.ID) ([]*models.Channel, error) {
+func GetServerChannels(ctx context.Context, serverId snowflake.ID) ([]*models.Channel, *appError.Error) {
 	channelsQuery := `
         SELECT c.*
         FROM channels c
@@ -185,19 +186,19 @@ func GetServerChannels(ctx context.Context, serverId snowflake.ID) ([]*models.Ch
 	err := database.PostgresDB.SelectContext(ctx, &channels, channelsQuery, serverId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return []*models.Channel{}, nil
+			return []*models.Channel{}, nil // FIXME: 404 error
 		}
 		logrus.WithFields(logrus.Fields{
 			"server_id": serverId,
 		}).WithError(err).Error("Failed to fetch channels from database")
-		return nil, errors.New("Failed to get server channels")
+		return nil, appError.NewInternal("Failed to get server channels")
 	}
 
 	return channels, nil
 }
 
 // Retrieves server members
-func GetServerMembers(ctx context.Context, serverId snowflake.ID, limit int, afterSnowflake snowflake.ID) ([]*models.Member, error) {
+func GetServerMembers(ctx context.Context, serverId snowflake.ID, limit int, afterSnowflake snowflake.ID) ([]*models.Member, *appError.Error) {
 	// Default limit 100 , max limit 200
 	if limit <= 0 {
 		limit = 100
@@ -241,12 +242,12 @@ func GetServerMembers(ctx context.Context, serverId snowflake.ID, limit int, aft
 	err := database.PostgresDB.SelectContext(ctx, &scans, query, args...)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return []*models.Member{}, nil
+			return []*models.Member{}, nil // FIXME: 404
 		}
 		logrus.WithFields(logrus.Fields{
 			"server_id": serverId,
 		}).WithError(err).Error("Failed to fetch server members from database")
-		return nil, errors.New("Failed to get server members")
+		return nil, appError.NewInternal("Failed to get server members")
 	}
 
 	// Get total count once
@@ -276,7 +277,7 @@ func GetServerMembers(ctx context.Context, serverId snowflake.ID, limit int, aft
 }
 
 // Get the member based on userID and serverID
-func GetUserServerMemember(ctx context.Context, userID snowflake.ID, serverID snowflake.ID) (*models.Member, error) {
+func GetUserServerMemember(ctx context.Context, userID snowflake.ID, serverID snowflake.ID) (*models.Member, *appError.Error) {
 	// NOTE: we have index on (user_id, server_id)
 	query := `SELECT *
 			  from members
@@ -291,19 +292,19 @@ func GetUserServerMemember(ctx context.Context, userID snowflake.ID, serverID sn
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, errors.New("Server member not found!")
+			return nil, appError.NewNotFound("Server member not found!")
 		}
 		logrus.WithFields(logrus.Fields{
 			"user_id":   userID,
 			"server_id": serverID,
 		}).WithError(err).Errorf("Failed to find server member on database")
-		return nil, errors.New("Failed to find server member")
+		return nil, appError.NewInternal("Failed to find server member")
 	}
 	return &member, nil
 }
 
 // Has user is member of the server
-func HasUserServerMember(ctx context.Context, userID snowflake.ID, serverID snowflake.ID) (bool, error) {
+func HasUserServerMember(ctx context.Context, userID snowflake.ID, serverID snowflake.ID) (bool, *appError.Error) {
 	const query = `SELECT EXISTS(SELECT 1
 								from members
 								where user_id = $1 AND server_id = $2)
@@ -319,7 +320,7 @@ func HasUserServerMember(ctx context.Context, userID snowflake.ID, serverID snow
 			"user_id":   userID,
 			"server_id": serverID,
 		}).WithError(err).Error("Database error during checking")
-		return false, fmt.Errorf("Failed to check has member of server")
+		return false, appError.NewInternal("Failed to check has member of server")
 	}
 	return exists, nil
 

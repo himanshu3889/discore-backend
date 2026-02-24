@@ -40,9 +40,9 @@ func GetUserServerMember(ctx *gin.Context) {
 		return
 	}
 
-	member, err := serverStore.GetUserServerMemember(ctx, userID, serverSnowID)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
+	member, appErr := serverStore.GetUserServerMemember(ctx, userID, serverSnowID)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 
@@ -68,9 +68,9 @@ func GetUserServerMemberProfile(ctx *gin.Context) {
 	}
 
 	// Check first if user is the member in the server or not
-	member, err := serverStore.GetUserServerMemember(ctx, userID, serverSnowID)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
+	member, appErr := serverStore.GetUserServerMemember(ctx, userID, serverSnowID)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 

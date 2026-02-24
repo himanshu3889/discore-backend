@@ -3,10 +3,10 @@ package accountStore
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 
 	"github.com/himanshu3889/discore-backend/base/databases"
+	"github.com/himanshu3889/discore-backend/base/lib/appError"
 	"github.com/himanshu3889/discore-backend/base/models"
 	"github.com/himanshu3889/discore-backend/base/utils"
 
@@ -15,7 +15,7 @@ import (
 )
 
 // Create a new user
-func CreateUser(ctx context.Context, user *models.User) error {
+func CreateUser(ctx context.Context, user *models.User) *appError.Error {
 	const queryUserInsert = `
 		INSERT INTO users (id, username, email, password, name, image_url, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, Now(), Now())
@@ -33,20 +33,20 @@ func CreateUser(ctx context.Context, user *models.User) error {
 	); err != nil {
 		if utils.IsDBUniqueViolationError(err) {
 			logrus.WithField("email", user.Email).Warn("User already exists in database")
-			return errors.New("User already exists in database")
+			return appError.NewBadRequest("User already exists in database")
 		}
 		logrus.WithFields(logrus.Fields{
 			"email":           user.Email,
 			"password_length": len(user.Password),
 			"image_url":       user.ImageUrl,
 		}).WithError(err).Error("Failed to create user")
-		return errors.New("Failed to create user")
+		return appError.NewInternal("Failed to create user")
 	}
 	return nil
 }
 
 // Create a new session for user in session
-func CreateSession(ctx context.Context, session *models.UserSession) error {
+func CreateSession(ctx context.Context, session *models.UserSession) *appError.Error {
 	const querySessionInsert = `
         INSERT INTO user_sessions (id, user_id, refresh_token, device_info,
                                    ip_address, expires_at)
@@ -63,13 +63,13 @@ func CreateSession(ctx context.Context, session *models.UserSession) error {
 		logrus.WithFields(logrus.Fields{
 			"user_id": session.UserID,
 		}).WithError(err).Error("Failed to create user session")
-		return errors.New("Failed to create user session")
+		return appError.NewInternal("Failed to create user session")
 	}
 	return nil
 }
 
 // Returns the session only if it belongs to the given user and is still valid.
-func GetUserSessionByToken(ctx context.Context, userID snowflake.ID, token string) (*models.UserSession, error) {
+func GetUserSessionByToken(ctx context.Context, userID snowflake.ID, token string) (*models.UserSession, *appError.Error) {
 	const querySessionGet = `
 		SELECT *
 		FROM user_sessions
@@ -83,13 +83,13 @@ func GetUserSessionByToken(ctx context.Context, userID snowflake.ID, token strin
 			"user_id": userID,
 			"token":   token,
 		}).Error("Unable to get user session token")
-		return nil, fmt.Errorf("Unable to get user %s session token", userID)
+		return nil, appError.NewInternal(fmt.Sprintf("Unable to get user %s session token", userID))
 	}
 	return &s, nil
 }
 
 // Removes the exact session row for that user/token pair.
-func DeleteUserSession(ctx context.Context, userID snowflake.ID, refreshToken string) error {
+func DeleteUserSession(ctx context.Context, userID snowflake.ID, refreshToken string) *appError.Error {
 	const queryDeleteSession = `DELETE FROM user_sessions WHERE user_id = $1 AND refresh_token = $2`
 	_, err := database.PostgresDB.ExecContext(ctx, queryDeleteSession, userID, refreshToken)
 	if err != nil {
@@ -97,22 +97,22 @@ func DeleteUserSession(ctx context.Context, userID snowflake.ID, refreshToken st
 			logrus.WithFields(logrus.Fields{
 				"user_id": userID,
 			}).Warn("session not found for delete")
-			return fmt.Errorf("session not found")
+			return appError.NewNotFound("session not found")
 		}
-		return fmt.Errorf("Unable to delete user session")
+		return appError.NewInternal("Unable to delete user session")
 	}
-	return err
+	return nil
 }
 
 // Delete all user sessions logs the user out everywhere.
-func DeleteUserAllSessions(ctx context.Context, userID snowflake.ID) error {
+func DeleteUserAllSessions(ctx context.Context, userID snowflake.ID) *appError.Error {
 	const queryDeleteAllSessions = `DELETE FROM user_sessions WHERE user_id = $1`
 	_, err := database.PostgresDB.ExecContext(ctx, queryDeleteAllSessions, userID)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			"user_id": userID,
 		}).WithError(err).Error("Unable to delete the user sessions")
-		return fmt.Errorf("Unable to delete the user sessions")
+		return appError.NewInternal("Unable to delete the user sessions")
 	}
-	return err
+	return nil
 }

@@ -2,8 +2,10 @@ package channelMessageStore
 
 import (
 	"context"
+	"errors"
 
 	"github.com/himanshu3889/discore-backend/base/databases"
+	"github.com/himanshu3889/discore-backend/base/lib/appError"
 	"github.com/himanshu3889/discore-backend/base/models"
 	userStore "github.com/himanshu3889/discore-backend/base/store/user"
 
@@ -14,7 +16,7 @@ import (
 )
 
 // Get channel last messages
-func GetServerChannelLastMessages(ctx context.Context, serverID, channelID snowflake.ID, limit int64, afterID *snowflake.ID) ([]*models.ChannelMessage, error) {
+func GetServerChannelLastMessages(ctx context.Context, serverID, channelID snowflake.ID, limit int64, afterID *snowflake.ID) ([]*models.ChannelMessage, *appError.Error) {
 	// Cap the limit
 	if limit > 100 {
 		limit = 100
@@ -40,14 +42,18 @@ func GetServerChannelLastMessages(ctx context.Context, serverID, channelID snowf
 			"channel_id": channelID,
 			"limit":      limit,
 		}).WithError(err).Error("Failed to fetch messages from database")
-		return nil, err
+		return nil, appError.NewInternal("Failed to fetch messages from database")
 	}
 
 	defer cursor.Close(ctx)
 
 	var messages []*models.ChannelMessage
 	if err = cursor.All(ctx, &messages); err != nil {
-		return nil, err
+		logrus.WithFields(logrus.Fields{
+			"channel_id": channelID,
+			"limit":      limit,
+		}).WithError(err).Error("Failed to fetch messages from database")
+		return nil, appError.NewInternal("Failed to fetch messages from database")
 	}
 
 	if len(messages) == 0 {
@@ -66,12 +72,12 @@ func GetServerChannelLastMessages(ctx context.Context, serverID, channelID snowf
 	}
 
 	// Batch fetch users
-	usersMap, err := userStore.GetUsersBatch(ctx, userIDs)
-	if err != nil {
+	usersMap, appErr := userStore.GetUsersBatch(ctx, userIDs)
+	if appErr != nil {
 		logrus.WithFields(logrus.Fields{
 			"channel_id": channelID,
 			"user_ids":   userIDs,
-		}).WithError(err).Warn("Failed to fetch users batch - messages will not include author data")
+		}).WithError(errors.New(appErr.Message)).Warn("Failed to fetch users batch")
 		// Continue without authors rather than failing completely
 	}
 

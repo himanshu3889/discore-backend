@@ -6,6 +6,7 @@ import (
 
 	redisDatabase "github.com/himanshu3889/discore-backend/base/infrastructure/redis"
 	"github.com/himanshu3889/discore-backend/base/infrastructure/redis/bloomFilter"
+	"github.com/himanshu3889/discore-backend/base/lib/appError"
 	rediskeys "github.com/himanshu3889/discore-backend/base/lib/redisKeys"
 	serverStore "github.com/himanshu3889/discore-backend/base/store/server"
 
@@ -13,7 +14,7 @@ import (
 )
 
 // Has user member of server; check the server in cache
-func HasUserServerMember(ctx context.Context, userID snowflake.ID, serverID snowflake.ID) (bool, error) {
+func HasUserServerMember(ctx context.Context, userID snowflake.ID, serverID snowflake.ID) (bool, *appError.Error) {
 	// Validate the server
 	cacheKey, cacheBoundedKey := rediskeys.Keys.Server.Info(serverID)
 	bloomKey := bloomFilter.ServerIDBloomFilter
@@ -25,9 +26,9 @@ func HasUserServerMember(ctx context.Context, userID snowflake.ID, serverID snow
 	}
 
 	if err != nil {
-		server, err := serverStore.GetServerByID(ctx, serverID)
-		if err != nil {
-			return false, err
+		server, appErr := serverStore.GetServerByID(ctx, serverID)
+		if appErr != nil {
+			return false, appErr
 		}
 		redisDatabase.GlobalCacheManager.Set(ctx, cacheKey, &bloomKey, server, &bloomItem, 30*24*time.Hour)
 	}

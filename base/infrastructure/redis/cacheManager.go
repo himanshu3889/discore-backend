@@ -184,7 +184,7 @@ func (cm *CacheManager) MGet(ctx context.Context, boundedKey string, cacheKeys [
 	return result, nil
 }
 
-// scripts must run independently for every caller.
+// scripts must run independently for every caller.  // TODO: log errors
 func (cm *CacheManager) RunScript(ctx context.Context, boundedKey string, script *redis.Script, keys []string, args ...interface{}) (interface{}, error) {
 	start := time.Now()
 

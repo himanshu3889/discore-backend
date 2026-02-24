@@ -27,9 +27,7 @@ func MetricsMiddleware() gin.HandlerFunc {
 		duration := time.Since(start).Seconds()
 
 		// Record metrics asynchronously
-		go func() {
-			baseMetrics.HttpRequestDuration.WithLabelValues(method, path, status).Observe(duration)
-			baseMetrics.HttpRequestsTotal.WithLabelValues(method, path, status).Inc()
-		}()
+		baseMetrics.HttpRequestDuration.WithLabelValues(method, path, status).Observe(duration)
+		baseMetrics.HttpRequestsTotal.WithLabelValues(method, path, status).Inc()
 	}
 }

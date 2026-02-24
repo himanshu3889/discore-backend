@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/himanshu3889/discore-backend/base/databases"
+	"github.com/himanshu3889/discore-backend/base/lib/appError"
 	"github.com/himanshu3889/discore-backend/base/models"
 
 	"github.com/bwmarrin/snowflake"
@@ -12,7 +13,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func GetChannelByID(ctx *gin.Context, channelID snowflake.ID) (*models.Channel, error) {
+// Get channel by ID
+func GetChannelByID(ctx *gin.Context, channelID snowflake.ID) (*models.Channel, *appError.Error) {
 	query := `
 		SELECT *
 		FROM channels c
@@ -28,7 +30,7 @@ func GetChannelByID(ctx *gin.Context, channelID snowflake.ID) (*models.Channel, 
 				"channel_id": channelID,
 			}).WithError(err).Error("Failed to fetch channels from database")
 		}
-		return nil, errors.New("Channel not found")
+		return nil, appError.NewNotFound("Channel not found")
 	}
 	return &channel, nil
 

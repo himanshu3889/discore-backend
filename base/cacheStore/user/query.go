@@ -3,9 +3,9 @@ package userCacheStore
 import (
 	"context"
 	"encoding/json"
-	"errors"
 
 	redisDatabase "github.com/himanshu3889/discore-backend/base/infrastructure/redis"
+	"github.com/himanshu3889/discore-backend/base/lib/appError"
 	rediskeys "github.com/himanshu3889/discore-backend/base/lib/redisKeys"
 	"github.com/himanshu3889/discore-backend/base/models"
 
@@ -15,9 +15,9 @@ import (
 
 // GetUsersBatch fetches users using the cache only
 // TODO: Improvement in this
-func GetUsersBatch(ctx context.Context, userIDs []snowflake.ID) (map[snowflake.ID]*models.User, error) {
+func GetUsersBatch(ctx context.Context, userIDs []snowflake.ID) (map[snowflake.ID]*models.User, *appError.Error) {
 	if len(userIDs) > 100 {
-		return nil, errors.New("Max user batching is 100")
+		return nil, appError.NewBadRequest("Max user batching is 100")
 	}
 	if len(userIDs) == 0 {
 		return map[snowflake.ID]*models.User{}, nil

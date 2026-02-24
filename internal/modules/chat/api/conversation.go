@@ -41,9 +41,9 @@ func getConversationForUser(ctx *gin.Context) {
 		utils.RespondWithError(ctx, http.StatusBadRequest, err.Error())
 	}
 
-	conversation, err := conversationStore.GetConversationForUser(ctx, conversationSnowID, userID)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusBadRequest, err.Error())
+	conversation, appErr := conversationStore.GetConversationForUser(ctx, conversationSnowID, userID)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 	}
 
 	utils.RespondWithSuccess(ctx, http.StatusOK, gin.H{
@@ -77,9 +77,9 @@ func getAllConversationForUser(ctx *gin.Context) {
 	// 	}
 	// }
 
-	conversations, err := conversationStore.GetAllConversationsForUser(ctx, userID, limit)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusBadRequest, err.Error())
+	conversations, appErr := conversationStore.GetAllConversationsForUser(ctx, userID, limit)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 	}
 
 	utils.RespondWithSuccess(ctx, http.StatusOK, gin.H{
@@ -103,9 +103,9 @@ func getOrCreateConversationForUsers(ctx *gin.Context) {
 		utils.RespondWithError(ctx, http.StatusBadRequest, err.Error())
 	}
 
-	conversation, err := conversationStore.GetOrCreateConversation(ctx, user1ID, user2ID)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusBadRequest, err.Error())
+	conversation, appErr := conversationStore.GetOrCreateConversation(ctx, user1ID, user2ID)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 	}
 
 	utils.RespondWithSuccess(ctx, http.StatusOK, gin.H{
@@ -146,15 +146,15 @@ func conversationMessagesForUser(ctx *gin.Context) {
 		}
 	}
 
-	conversation, err := conversationStore.GetConversationForUser(ctx, conversationSnowID, userID)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusBadRequest, err.Error())
+	conversation, appErr := conversationStore.GetConversationForUser(ctx, conversationSnowID, userID)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 	}
 
-	messages, err := directMessageStore.GetConversationLastMessages(ctx, conversationSnowID, limit, afterCursor)
+	messages, appErr := directMessageStore.GetConversationLastMessages(ctx, conversationSnowID, limit, afterCursor)
 
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusBadRequest, err.Error())
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 

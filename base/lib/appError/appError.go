@@ -11,6 +11,7 @@ const (
 	StatusForbidden           ErrorCode = http.StatusForbidden           // 403
 	StatusNotFound            ErrorCode = http.StatusNotFound            // 404
 	StatusConflict            ErrorCode = http.StatusConflict            // 409
+	StatusGone                ErrorCode = http.StatusGone                // 410
 	StatusInternalServerError ErrorCode = http.StatusInternalServerError // 500
 )
 

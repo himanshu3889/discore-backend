@@ -10,6 +10,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// TODO: implement the error logger here and metric for that also
+
 // ConsumerManager runs multiple consumers with graceful shutdown
 type ConsumerManager struct {
 	name      string

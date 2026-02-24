@@ -18,6 +18,8 @@ type KafkaProducer struct {
 	writer *kafka.Writer
 }
 
+// TODO: implement the error logger here and metric for that also
+
 // New kafka producer
 func NewProducer(brokers []string) *KafkaProducer {
 	return &KafkaProducer{

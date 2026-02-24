@@ -3,10 +3,8 @@ package channelStore
 import (
 	"context"
 	"database/sql"
-	"errors"
-	"fmt"
-
 	"github.com/himanshu3889/discore-backend/base/databases"
+	"github.com/himanshu3889/discore-backend/base/lib/appError"
 	"github.com/himanshu3889/discore-backend/base/models"
 	"github.com/himanshu3889/discore-backend/base/utils"
 
@@ -15,7 +13,7 @@ import (
 )
 
 // Create channel in the server
-func CreateChannel(ctx context.Context, channel *models.Channel) error {
+func CreateChannel(ctx context.Context, channel *models.Channel) *appError.Error {
 	const query = `INSERT INTO channels 
 		(id, name, type, creator_id, server_id, created_at, updated_at) 
 		VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) 
@@ -34,13 +32,13 @@ func CreateChannel(ctx context.Context, channel *models.Channel) error {
 			"server_id":    channel.ServerID,
 			"user_id":      channel.CreatorID,
 		}).WithError(err).Error("Failed to create channel for server")
-		return errors.New("Failed to create channel for the server")
+		return appError.NewInternal("Failed to create channel for the server")
 	}
 	return nil
 }
 
 // Update channel name by the channel id
-func UpdateChannelNameType(ctx context.Context, channel *models.Channel) error {
+func UpdateChannelNameType(ctx context.Context, channel *models.Channel) *appError.Error {
 	const query = `
         UPDATE channels 
 		SET name = $1, type =$2, updated_at = NOW()
@@ -60,20 +58,20 @@ func UpdateChannelNameType(ctx context.Context, channel *models.Channel) error {
 			logrus.WithFields(logrus.Fields{
 				"channel_id": channel.ID,
 			}).Warn("Channel not found for update")
-			return fmt.Errorf("Channel not found")
+			return appError.NewNotFound("Channel not found")
 		}
 		logrus.WithFields(logrus.Fields{
 			"channel_id":   channel.ID,
 			"channel_name": channel.Name,
 		}).WithError(err).Error("Failed to update channel in database")
-		return errors.New("Failed to update channel")
+		return appError.NewInternal("Failed to update channel")
 	}
 
 	return nil
 }
 
 // Soft delete the channel
-func SoftDeleteChannelById(ctx context.Context, channelID snowflake.ID) (*models.Channel, error) {
+func SoftDeleteChannelById(ctx context.Context, channelID snowflake.ID) (*models.Channel, *appError.Error) {
 	// Soft Delete
 	const query = `
         UPDATE channels 
@@ -94,18 +92,18 @@ func SoftDeleteChannelById(ctx context.Context, channelID snowflake.ID) (*models
 			logrus.WithFields(logrus.Fields{
 				"channel_id": channelID,
 			}).Warn("Channel not found for soft delete")
-			return nil, fmt.Errorf("Channel not found")
+			return nil, appError.NewNotFound("Channel not found")
 		}
 		logrus.WithFields(logrus.Fields{
 			"channel_id": channelID,
 		}).WithError(err).Error("Failed to soft delete channel in database")
-		return nil, errors.New("Failed to soft delete channel")
+		return nil, appError.NewInternal("Failed to delete channel")
 	}
-	return &channel, err
+	return &channel, nil
 }
 
 // Permanently delete the channel
-func HardDeleteChannelById(ctx context.Context, channelID snowflake.ID) (*models.Channel, error) {
+func HardDeleteChannelById(ctx context.Context, channelID snowflake.ID) (*models.Channel, *appError.Error) {
 	const query = `DELETE FROM channels 
 				WHERE id = $1 
 				RETURNING *`
@@ -121,12 +119,12 @@ func HardDeleteChannelById(ctx context.Context, channelID snowflake.ID) (*models
 			logrus.WithFields(logrus.Fields{
 				"channel_id": channelID,
 			}).Warn("Channel not found for soft delete")
-			return nil, fmt.Errorf("Channel not found")
+			return nil, appError.NewNotFound("Channel not found")
 		}
 		logrus.WithFields(logrus.Fields{
 			"channel_id": channelID,
 		}).WithError(err).Error("Failed to soft delete channel in database")
-		return nil, errors.New("Failed to soft delete channel")
+		return nil, appError.NewNotFound("Failed to delete channel")
 	}
-	return &channel, err
+	return &channel, nil
 }

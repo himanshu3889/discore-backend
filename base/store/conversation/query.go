@@ -3,9 +3,9 @@ package conversation
 import (
 	"context"
 	"database/sql"
-	"errors"
 
 	"github.com/himanshu3889/discore-backend/base/databases"
+	"github.com/himanshu3889/discore-backend/base/lib/appError"
 	"github.com/himanshu3889/discore-backend/base/models"
 
 	"github.com/bwmarrin/snowflake"
@@ -13,10 +13,10 @@ import (
 )
 
 // Gets a conversation only if the user is a participant
-func GetConversationForUser(ctx context.Context, conversationID, userID snowflake.ID) (*models.Conversation, error) {
+func GetConversationForUser(ctx context.Context, conversationID, userID snowflake.ID) (*models.Conversation, *appError.Error) {
 	if conversationID == 0 || userID == 0 {
 		logrus.Error("Conversation ID and User ID are required")
-		return nil, errors.New("conversation ID and user ID are required")
+		return nil, appError.NewBadRequest("conversation ID and user ID are required")
 	}
 
 	query := `
@@ -36,17 +36,17 @@ func GetConversationForUser(ctx context.Context, conversationID, userID snowflak
 			"conversation_id": conversationID,
 			"user_id":         userID,
 		}).WithError(err).Error("Failed to fetch conversation for user")
-		return nil, errors.New("failed to fetch conversation")
+		return nil, appError.NewInternal("failed to fetch conversation")
 	}
 
 	return &conversation, nil
 }
 
 // Gets a conversation between two specific users
-func GetConversationBetweenUsers(ctx context.Context, user1ID, user2ID snowflake.ID) (*models.Conversation, error) {
+func GetConversationBetweenUsers(ctx context.Context, user1ID, user2ID snowflake.ID) (*models.Conversation, *appError.Error) {
 	if user1ID == 0 || user2ID == 0 {
 		logrus.Error("Both user IDs are required to fetch conversation")
-		return nil, errors.New("both user IDs are required")
+		return nil, appError.NewBadRequest("both user IDs are required")
 	}
 
 	// Enforce ID ordering to match CHECK constraint
@@ -74,17 +74,17 @@ func GetConversationBetweenUsers(ctx context.Context, user1ID, user2ID snowflake
 			"user1_id": user1ID,
 			"user2_id": user2ID,
 		}).WithError(err).Error("Failed to fetch conversation between users")
-		return nil, errors.New("failed to fetch conversation between users")
+		return nil, appError.NewInternal("failed to fetch conversation between users")
 	}
 
 	return &conversation, nil
 }
 
 // Gets all conversations for a specific user // FIXME: Need to fetch more ?
-func GetAllConversationsForUser(ctx context.Context, userID snowflake.ID, limit int64) ([]models.Conversation, error) {
+func GetAllConversationsForUser(ctx context.Context, userID snowflake.ID, limit int64) ([]models.Conversation, *appError.Error) {
 	if userID == 0 {
 		logrus.Error("User ID is required to fetch conversations")
-		return nil, errors.New("user ID is required")
+		return nil, appError.NewInternal("user ID is required")
 	}
 
 	if limit <= 0 {
@@ -134,7 +134,7 @@ func GetAllConversationsForUser(ctx context.Context, userID snowflake.ID, limit 
 			"user_id": userID,
 			"limit":   limit,
 		}).WithError(err).Error("Failed to fetch user's conversations")
-		return nil, errors.New("failed to fetch user's conversations")
+		return nil, appError.NewInternal("failed to fetch user's conversation")
 	}
 
 	return conversations, nil

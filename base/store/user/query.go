@@ -2,9 +2,9 @@ package userStore
 
 import (
 	"context"
-	"errors"
 
 	database "github.com/himanshu3889/discore-backend/base/databases"
+	"github.com/himanshu3889/discore-backend/base/lib/appError"
 	"github.com/himanshu3889/discore-backend/base/models"
 
 	"github.com/bwmarrin/snowflake"
@@ -12,11 +12,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Fetches multiple users in a single query; Limit 100
-// TODO: need to implement the caching
-func GetUsersBatch(ctx context.Context, userIDs []snowflake.ID) (map[snowflake.ID]*models.User, error) {
+// Fetches multiple users in a single query; max Limit 100
+func GetUsersBatch(ctx context.Context, userIDs []snowflake.ID) (map[snowflake.ID]*models.User, *appError.Error) {
 	if len(userIDs) > 100 {
-		return nil, errors.New("Max user batching is 100")
+		return nil, appError.NewBadRequest("Max user batching is 100")
 	}
 	if len(userIDs) == 0 {
 		return map[snowflake.ID]*models.User{}, nil
@@ -35,7 +34,8 @@ func GetUsersBatch(ctx context.Context, userIDs []snowflake.ID) (map[snowflake.I
 		logrus.WithFields(logrus.Fields{
 			"user_ids_len": len(userIDs),
 		}).WithError(err).Error("Failed to fetch users batch")
-		return nil, errors.New("failed to fetch users")
+
+		return nil, appError.NewInternal("failed to fetch users")
 	}
 
 	// Convert to map for O(1) lookups

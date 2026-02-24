@@ -40,9 +40,9 @@ func CreateChannel(ctx *gin.Context) {
 	// FIXME: Admin or moderator only can create the channel in the server
 	incomingChannel.CreatorID = userID
 
-	err := channelCacheStore.CreateChannel(ctx, incomingChannel)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
+	appErr := channelCacheStore.CreateChannel(ctx, incomingChannel)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 
@@ -66,9 +66,9 @@ func GetChannelByID(ctx *gin.Context) {
 		return
 	}
 
-	channel, err := channelCacheStore.GetChannelByID(ctx, channelSnowID)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
+	channel, appErr := channelCacheStore.GetChannelByID(ctx, channelSnowID)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 
@@ -100,9 +100,9 @@ func UpdateChannelByID(ctx *gin.Context) {
 
 	incomingChannel.ID = channelSnowID
 
-	err = channelCacheStore.UpdateChannelNameType(ctx, incomingChannel)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
+	appErr := channelCacheStore.UpdateChannelNameType(ctx, incomingChannel)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 
@@ -126,9 +126,9 @@ func DeleteChannelByID(ctx *gin.Context) {
 		return
 	}
 
-	_, err = channelCacheStore.HardDeleteChannelById(ctx, channelSnowID)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
+	_, appErr := channelCacheStore.HardDeleteChannelById(ctx, channelSnowID)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 

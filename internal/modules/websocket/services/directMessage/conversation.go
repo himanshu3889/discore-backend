@@ -3,6 +3,7 @@ package directmessageService
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/himanshu3889/discore-backend/base/models"
 	directmessage "github.com/himanshu3889/discore-backend/base/store/directMessage"
@@ -23,7 +24,7 @@ func SendDirectMessage(rawMessage *json.RawMessage, userID snowflake.ID) (*model
 	msg.ID = msgID
 	msg.UserID = userID
 
-	err := directmessage.CreateDirectMessage(ctx, &msg)
+	appErr := directmessage.CreateDirectMessage(ctx, &msg)
 
-	return &msg, err
+	return &msg, errors.New(appErr.Message)
 }

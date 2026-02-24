@@ -3,6 +3,7 @@ package ChatkafkaService
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	baseKafka "github.com/himanshu3889/discore-backend/base/infrastructure/kafka"
@@ -38,9 +39,9 @@ func HandleChannelByteMessage(msg []byte, ID snowflake.ID, userID snowflake.ID, 
 	incomingMessage.CreatedAt = createdAt
 
 	ctx := context.Background()
-	message, err := channelMessageStore.CreateChannelMessage(ctx, &incomingMessage)
-	if err != nil {
-		return nil, err
+	message, appErr := channelMessageStore.CreateChannelMessage(ctx, &incomingMessage)
+	if appErr != nil {
+		return nil, errors.New(appErr.Message)
 	}
 	return message, nil
 

@@ -3,29 +3,31 @@ package serverCacheStore
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"time"
 
 	memberCacheStore "github.com/himanshu3889/discore-backend/base/cacheStore/member"
 	redisDatabase "github.com/himanshu3889/discore-backend/base/infrastructure/redis"
 	"github.com/himanshu3889/discore-backend/base/infrastructure/redis/bloomFilter"
+	"github.com/himanshu3889/discore-backend/base/lib/appError"
 	modelsLib "github.com/himanshu3889/discore-backend/base/lib/models"
 	rediskeys "github.com/himanshu3889/discore-backend/base/lib/redisKeys"
 	"github.com/himanshu3889/discore-backend/base/models"
 	serverStore "github.com/himanshu3889/discore-backend/base/store/server"
 	"github.com/redis/go-redis/v9"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/bwmarrin/snowflake"
 )
 
 // Create new server and write around cache
-func CreateServer(ctx context.Context, server *models.Server) error {
+func CreateServer(ctx context.Context, server *models.Server) *appError.Error {
 
 	// DB creation
-	err := serverStore.CreateServer(ctx, server)
-	if err != nil {
-		return err
+	appErr := serverStore.CreateServer(ctx, server)
+	if appErr != nil {
+		return appErr
 	}
 
 	// async write to cache
@@ -40,11 +42,11 @@ func CreateServer(ctx context.Context, server *models.Server) error {
 }
 
 // Update server by name and image; and write around cache
-func UpdateServerNameImage(ctx context.Context, server *models.Server) error {
+func UpdateServerNameImage(ctx context.Context, server *models.Server) *appError.Error {
 	// DB creation
-	err := serverStore.UpdateServerNameImage(ctx, server)
-	if err != nil {
-		return err
+	appErr := serverStore.UpdateServerNameImage(ctx, server)
+	if appErr != nil {
+		return appErr
 	}
 
 	// async write to cache
@@ -59,11 +61,11 @@ func UpdateServerNameImage(ctx context.Context, server *models.Server) error {
 }
 
 // Create server invite and write around cache
-func CreateServerInvite(ctx context.Context, serverInvite *models.ServerInvite) error {
+func CreateServerInvite(ctx context.Context, serverInvite *models.ServerInvite) *appError.Error {
 	// DB creation
-	err := serverStore.CreateServerInvite(ctx, serverInvite)
-	if err != nil {
-		return err
+	appErr := serverStore.CreateServerInvite(ctx, serverInvite)
+	if appErr != nil {
+		return appErr
 	}
 
 	// async write to cache
@@ -84,15 +86,16 @@ func CreateServerInvite(ctx context.Context, serverInvite *models.ServerInvite) 
 var inviteDbFlightGroup singleflight.Group
 
 // Get the server invite with singleflight; avoid thunderherd
-func GetServerInvite(ctx context.Context, code string) (*models.ServerInvite, error) {
+func GetServerInvite(ctx context.Context, code string) (*models.ServerInvite, *appError.Error) {
 	// Check DB, how you deal with the usedCounts
 	res, err, _ := inviteDbFlightGroup.Do(code, func() (interface{}, error) {
 		serverInviteCacheKey, _ := rediskeys.Keys.ServerInvite.Info(code)
 		serverInviteBloomKey := bloomFilter.ServerInviteBloomFilter
 		bloomItem := code
-		serverInvite, err := serverStore.GetServerInvite(ctx, code)
-		if err != nil {
-			return nil, fmt.Errorf("Invite code error") // TODO: EXACT ERROR ?, not found, db error ?
+		serverInvite, appErr := serverStore.GetServerInvite(ctx, code)
+		if appErr != nil {
+			logrus.WithFields(logrus.Fields{"invite_code": code}).WithError(errors.New(appErr.Message)).Error("Singleflight server invite")
+			return appErr, errors.New(appErr.Message) // send the exact err as the res
 		}
 		// Save to cache
 		redisDatabase.GlobalCacheManager.Set(
@@ -108,8 +111,10 @@ func GetServerInvite(ctx context.Context, code string) (*models.ServerInvite, er
 		redisDatabase.GlobalCacheManager.Set(ctx, codeUsageKey, &serverInviteBloomKey, serverInvite.UsedCount, &bloomItem, 25*time.Hour)
 		return serverInvite, nil
 	})
+
 	if err != nil {
-		return nil, err
+		appErr := res.(*appError.Error) // the exact appErr
+		return nil, appErr
 	}
 
 	serverInvite := res.(*models.ServerInvite)
@@ -118,7 +123,7 @@ func GetServerInvite(ctx context.Context, code string) (*models.ServerInvite, er
 
 // Accept the server invite and create memember; if already a member then don't consume invite, return serverInvite
 // TODO: Require logging
-func AcceptServerInviteAndCreateMember(ctx context.Context, userID snowflake.ID, code string) (*models.ServerInvite, error) {
+func AcceptServerInviteAndCreateMember(ctx context.Context, userID snowflake.ID, code string) (*models.ServerInvite, *appError.Error) {
 	// Check in cache first then accept
 	serverInviteCacheKey, cacheBoundedKey := rediskeys.Keys.ServerInvite.Info(code)
 	serverInviteBloomKey := bloomFilter.ServerInviteBloomFilter
@@ -126,62 +131,63 @@ func AcceptServerInviteAndCreateMember(ctx context.Context, userID snowflake.ID,
 	codeBytes, cacheErr := redisDatabase.GlobalCacheManager.Get(ctx, cacheBoundedKey, serverInviteCacheKey, &serverInviteBloomKey, &serverInviteBloomItem)
 	if codeBytes == nil && cacheErr == nil {
 		// Server invite does not exist
-		return nil, fmt.Errorf("Invalid code")
+		return nil, appError.NewBadRequest("Invalid code")
 	}
 
 	serverInvite := &models.ServerInvite{}
-	var err error
 	if cacheErr == nil {
 		// If no cache error then unmarshall the cache bytes
-		err = json.Unmarshal(codeBytes, serverInvite)
+		err := json.Unmarshal(codeBytes, serverInvite)
 		if err != nil {
-			return nil, err
+			logrus.WithFields(logrus.Fields{"invite_code": code}).WithError(err).Error("Unmarshall error in accept server invite")
+			return nil, appError.NewInternal(err.Error())
 		}
 	} else {
 		// If cache miss then load and cache it first
-		serverInvite, err = GetServerInvite(ctx, code)
-		if err != nil {
-			return nil, err
+		var appErr *appError.Error
+		serverInvite, appErr = GetServerInvite(ctx, code)
+		if appErr != nil {
+			return nil, appErr
 		}
 	}
 
 	// Code usage check; Fail fast by usage limit; if not unlimited usage
-	err = modelsLib.ValidateServerInvite(serverInvite)
-	if err != nil {
-		return nil, err
+	appErr := modelsLib.ValidateServerInvite(serverInvite)
+	if appErr != nil {
+		return nil, appErr
 	}
 
 	// Check if already the member of the server or not ?
-	hasAlreadyMember, err := memberCacheStore.HasUserServerMember(ctx, userID, serverInvite.ServerID)
+	hasAlreadyMember, appErr := memberCacheStore.HasUserServerMember(ctx, userID, serverInvite.ServerID)
 
-	if err != nil {
-		return nil, err
+	if appErr != nil {
+		return nil, appErr
 	}
 	if hasAlreadyMember {
-		return nil, fmt.Errorf("Already a member of the server")
+		return nil, appError.NewBadRequest("Already a member of the server")
 	}
 
 	// Let's try to create member and accept invite
 
 	// FIXME: lost it if failed; Improve this using kafka; first push in kafka; reduce redis count
 	// Use the invite
-	err = consumeServerInviteCache(ctx, serverInvite)
-	if err != nil {
-		return nil, err
+	appErr = consumeServerInviteCache(ctx, serverInvite)
+	if appErr != nil {
+		return nil, appErr
 	}
 
 	// Create member
-	_, err = serverStore.CreateServerMember(ctx, userID, serverInvite.ServerID)
-	if err != nil {
-		return nil, err
+	_, appErr = serverStore.CreateServerMember(ctx, userID, serverInvite.ServerID)
+	if appErr != nil {
+		return nil, appErr
 	}
 
-	// Could combine multiples to update the count
+	// FIXME: Could combine multiples to update the count
 	go func() {
 		serverStore.UseServerInvite(ctx, serverInvite.Code)
 	}()
 
-	return serverInvite, err
+	return serverInvite, appErr
 }
 
 // Consume the server invite using the cache
@@ -207,11 +213,11 @@ var consumeInviteScript = redis.NewScript(`
 `)
 
 // Consume the server invite using the redis
-func consumeServerInviteCache(ctx context.Context, serverInvite *models.ServerInvite) error {
+func consumeServerInviteCache(ctx context.Context, serverInvite *models.ServerInvite) *appError.Error {
 	// validate invite
-	err := modelsLib.ValidateServerInvite(serverInvite)
-	if err != nil {
-		return err
+	appErr := modelsLib.ValidateServerInvite(serverInvite)
+	if appErr != nil {
+		return appErr
 	}
 
 	// Check if the pointer field is nil before dereferencing
@@ -230,25 +236,25 @@ func consumeServerInviteCache(ctx context.Context, serverInvite *models.ServerIn
 	)
 
 	if err != nil {
-		return fmt.Errorf("Failed to execute usage script: %w", err)
+		return appError.NewInternal(err.Error())
 	}
 
 	newUsedCount, ok := rawResult.(int64)
 	if !ok {
-		return fmt.Errorf("Unexpected script return type")
+		return appError.NewInternal("Unexpected script return type")
 	}
 
 	if newUsedCount == -429 {
-		return fmt.Errorf("Code usage limit exceeded")
+		return &appError.Error{Message: "Code usage limit exceeded", Code: appError.StatusGone}
 	}
 
 	if newUsedCount == -1 {
-		return fmt.Errorf("Cache code usage error")
+		return appError.NewInternal("Code not found")
 	}
 
 	// Update the local struct so the caller has the fresh count
 	serverInvite.UsedCount = int(newUsedCount)
 
-	return err
+	return nil
 
 }

@@ -6,6 +6,7 @@ import (
 
 	redisDatabase "github.com/himanshu3889/discore-backend/base/infrastructure/redis"
 	"github.com/himanshu3889/discore-backend/base/infrastructure/redis/bloomFilter"
+	"github.com/himanshu3889/discore-backend/base/lib/appError"
 	rediskeys "github.com/himanshu3889/discore-backend/base/lib/redisKeys"
 	"github.com/himanshu3889/discore-backend/base/models"
 	channelStore "github.com/himanshu3889/discore-backend/base/store/channel"
@@ -14,11 +15,11 @@ import (
 )
 
 // Create channel and write around cache
-func CreateChannel(ctx context.Context, channel *models.Channel) error {
+func CreateChannel(ctx context.Context, channel *models.Channel) *appError.Error {
 	// DB creation
-	err := channelStore.CreateChannel(ctx, channel)
-	if err != nil {
-		return err
+	appErr := channelStore.CreateChannel(ctx, channel)
+	if appErr != nil {
+		return appErr
 	}
 
 	// async write to cache
@@ -32,11 +33,11 @@ func CreateChannel(ctx context.Context, channel *models.Channel) error {
 }
 
 // Update channel by name and type; write around cache
-func UpdateChannelNameType(ctx context.Context, channel *models.Channel) error {
+func UpdateChannelNameType(ctx context.Context, channel *models.Channel) *appError.Error {
 	// DB creation
-	err := channelStore.UpdateChannelNameType(ctx, channel)
-	if err != nil {
-		return err
+	appErr := channelStore.UpdateChannelNameType(ctx, channel)
+	if appErr != nil {
+		return appErr
 	}
 
 	// async write to cache
@@ -50,11 +51,11 @@ func UpdateChannelNameType(ctx context.Context, channel *models.Channel) error {
 }
 
 // Hard delete channel by id and write around it cache set null
-func HardDeleteChannelById(ctx context.Context, channelID snowflake.ID) (*models.Channel, error) {
+func HardDeleteChannelById(ctx context.Context, channelID snowflake.ID) (*models.Channel, *appError.Error) {
 	// DB creation
-	channel, err := channelStore.HardDeleteChannelById(ctx, channelID)
-	if err != nil {
-		return nil, err
+	channel, appErr := channelStore.HardDeleteChannelById(ctx, channelID)
+	if appErr != nil {
+		return nil, appErr
 	}
 
 	// async write to cache

@@ -3,10 +3,10 @@ package conversation
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"time"
 
 	"github.com/himanshu3889/discore-backend/base/databases"
+	"github.com/himanshu3889/discore-backend/base/lib/appError"
 	"github.com/himanshu3889/discore-backend/base/models"
 	"github.com/himanshu3889/discore-backend/base/utils"
 
@@ -15,18 +15,18 @@ import (
 )
 
 // Create conversation b/w two users
-func GetOrCreateConversation(ctx context.Context, user1ID, user2ID snowflake.ID) (*models.Conversation, error) {
+func GetOrCreateConversation(ctx context.Context, user1ID, user2ID snowflake.ID) (*models.Conversation, *appError.Error) {
 	if user1ID == 0 {
 		logrus.Error("User1 ID is required to create message")
-		return nil, errors.New("user1 ID is required")
+		return nil, appError.NewBadRequest("user1 ID is required")
 	}
 	if user2ID == 0 {
 		logrus.Error("User2 ID is required to create message")
-		return nil, errors.New("user2 ID is required")
+		return nil, appError.NewBadRequest("user2 ID is required")
 	}
 	if user1ID == user2ID {
 		logrus.Error("Self conversations not allowed")
-		return nil, errors.New("Self conversations not allowed")
+		return nil, appError.NewBadRequest("Self conversations not allowed")
 	}
 
 	// var conversation = &models.Conv
@@ -89,13 +89,13 @@ func GetOrCreateConversation(ctx context.Context, user1ID, user2ID snowflake.ID)
 	if err != nil {
 		if utils.IsDBUniqueViolationError(err) {
 			logrus.WithFields(logrus.Fields{"user1_id": conversation.User1ID, "user2_id": conversation.User2ID}).Warn("users conversation already exists in database")
-			return nil, errors.New("users conversation already exists in database")
+			return nil, appError.NewBadRequest("users conversation already exists in database")
 		}
 		logrus.WithFields(logrus.Fields{
 			"user1_id": conversation.User1ID,
 			"user2_id": conversation.User2ID,
 		}).WithError(err).Error("Failed to insert message in direct messages")
-		return nil, errors.New("Failed to insert the message in direct messages")
+		return nil, appError.NewInternal("Failed to insert the message in direct messages")
 	}
 	conversation.MeID = &user1ID
 	return &conversation, nil
@@ -103,10 +103,10 @@ func GetOrCreateConversation(ctx context.Context, user1ID, user2ID snowflake.ID)
 }
 
 // Updates the updated_at field for a conversation
-func UpdateConversationTimestampForUser(ctx context.Context, conversationID, userID snowflake.ID) (*models.Conversation, error) {
+func UpdateConversationTimestampForUser(ctx context.Context, conversationID, userID snowflake.ID) (*models.Conversation, *appError.Error) {
 	if conversationID == 0 || userID == 0 {
 		logrus.Error("Conversation ID and User ID are required")
-		return nil, errors.New("conversation ID and user ID are required")
+		return nil, appError.NewBadRequest("conversation ID and user ID are required")
 	}
 
 	query := `
@@ -126,21 +126,21 @@ func UpdateConversationTimestampForUser(ctx context.Context, conversationID, use
 		logrus.WithFields(logrus.Fields{
 			"conversation_id": conversationID,
 		}).WithError(err).Error("Failed to update conversation timestamp")
-		return nil, errors.New("failed to update conversation")
+		return nil, appError.NewInternal("failed to update conversation")
 	}
 
 	return &conversation, nil
 }
 
 // Create conversation b/w two users
-func CreateConversation(ctx context.Context, conversation *models.Conversation) (*models.Conversation, error) {
+func CreateConversation(ctx context.Context, conversation *models.Conversation) (*models.Conversation, *appError.Error) {
 	if conversation.User1ID == 0 {
 		logrus.Error("User1 ID is required to create message")
-		return nil, errors.New("user1 ID is required")
+		return nil, appError.NewBadRequest("user1 ID is required")
 	}
 	if conversation.User2ID == 0 {
 		logrus.Error("User2 ID is required to create message")
-		return nil, errors.New("user2 ID is required")
+		return nil, appError.NewBadRequest("user2 ID is required")
 	}
 
 	conversation.CreatedAt = time.Now()
@@ -168,13 +168,13 @@ func CreateConversation(ctx context.Context, conversation *models.Conversation) 
 	if err != nil {
 		if utils.IsDBUniqueViolationError(err) {
 			logrus.WithFields(logrus.Fields{"user1_id": conversation.User1ID, "user2_id": conversation.User2ID}).Warn("users conversation already exists in database")
-			return nil, errors.New("users conversation already exists in database")
+			return nil, appError.NewBadRequest("users conversation already exists in database")
 		}
 		logrus.WithFields(logrus.Fields{
 			"user1_id": conversation.User1ID,
 			"user2_id": conversation.User2ID,
 		}).WithError(err).Error("Failed to insert message in direct messages")
-		return nil, errors.New("Failed to insert the message in direct messages")
+		return nil, appError.NewBadRequest("Failed to insert the message in direct messages")
 	}
 
 	return conversation, nil

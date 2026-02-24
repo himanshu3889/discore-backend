@@ -40,9 +40,9 @@ func UserFirstJoinedServer(ctx *gin.Context) {
 		return
 	}
 
-	firstServer, err := serverStore.UserFirstJoinedServer(ctx, userID)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
+	firstServer, appErr := serverStore.UserFirstJoinedServer(ctx, userID)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 
@@ -72,9 +72,9 @@ func UserServer(ctx *gin.Context) {
 		return
 	}
 
-	userServer, member, err := serverStore.GetServerMembershipForUser(ctx, serverSnowID, userID)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
+	userServer, member, appErr := serverStore.GetServerMembershipForUser(ctx, serverSnowID, userID)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 
@@ -104,9 +104,9 @@ func UserServerChannels(ctx *gin.Context) {
 		return
 	}
 
-	server, member, err := serverStore.GetServerMembershipForUser(ctx, serverSnowID, userID)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
+	server, member, appErr := serverStore.GetServerMembershipForUser(ctx, serverSnowID, userID)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 
@@ -116,10 +116,10 @@ func UserServerChannels(ctx *gin.Context) {
 		return
 	}
 
-	serverChannels, err := serverCacheStore.GetServerChannels(ctx, serverSnowID)
+	serverChannels, appErr := serverCacheStore.GetServerChannels(ctx, serverSnowID)
 
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 
@@ -144,9 +144,9 @@ func GetServerMembers(ctx *gin.Context) {
 		return
 	}
 
-	userServer, _, err := serverStore.GetServerMembershipForUser(ctx, serverSnowID, userID)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
+	userServer, _, appErr := serverStore.GetServerMembershipForUser(ctx, serverSnowID, userID)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 
@@ -155,9 +155,9 @@ func GetServerMembers(ctx *gin.Context) {
 		return
 	}
 
-	members, err := serverCacheStore.GetServerMembers(ctx, serverSnowID, 50, 0)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
+	members, appErr := serverCacheStore.GetServerMembers(ctx, serverSnowID, 50, 0)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 
@@ -172,9 +172,9 @@ func UserAllJoinedServers(ctx *gin.Context) {
 		return
 	}
 
-	joinedServers, err := serverStore.UserJoinedServers(ctx, userID)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
+	joinedServers, appErr := serverStore.UserJoinedServers(ctx, userID)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 
@@ -201,9 +201,9 @@ func CreateServer(ctx *gin.Context) {
 		return
 	}
 	incomingServer.OwnerID = userID
-	err := serverCacheStore.CreateServer(ctx, incomingServer)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
+	appErr := serverCacheStore.CreateServer(ctx, incomingServer)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 	// create a general channel for it
@@ -213,9 +213,9 @@ func CreateServer(ctx *gin.Context) {
 		CreatorID: incomingServer.OwnerID,
 		ServerID:  incomingServer.ID,
 	}
-	err = channelCacheStore.CreateChannel(ctx, createdChannel)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
+	appErr = channelCacheStore.CreateChannel(ctx, createdChannel)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 
@@ -225,9 +225,9 @@ func CreateServer(ctx *gin.Context) {
 		UserID:   incomingServer.OwnerID,
 		ServerID: incomingServer.ID,
 	}
-	err = memberStore.CreateMember(ctx, createdMember)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
+	appErr = memberStore.CreateMember(ctx, createdMember)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 
@@ -267,9 +267,9 @@ func EditServer(ctx *gin.Context) {
 	}
 
 	// Check if user is the owner of the server or not
-	hasOwn, err := serverStore.HasUserOwnServer(ctx, userID, serverSnowID)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
+	hasOwn, appErr := serverStore.HasUserOwnServer(ctx, userID, serverSnowID)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 
@@ -278,9 +278,9 @@ func EditServer(ctx *gin.Context) {
 		return
 	}
 
-	err = serverCacheStore.UpdateServerNameImage(ctx, incomingServer)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
+	appErr = serverCacheStore.UpdateServerNameImage(ctx, incomingServer)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 
@@ -308,12 +308,15 @@ func CreateServerInvite(ctx *gin.Context) {
 
 	serverID := ctx.Param("serverID")
 	serverSnowID, err := utils.ValidSnowflakeID(serverID)
+	if err != nil {
+		utils.RespondWithError(ctx, http.StatusBadRequest, "Invalid server id")
+	}
 
 	incomingServerInvite.ServerID = serverSnowID
 	incomingServerInvite.CreatedBy = userID
-	err = serverCacheStore.CreateServerInvite(ctx, incomingServerInvite)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusInternalServerError, err.Error())
+	appErr := serverCacheStore.CreateServerInvite(ctx, incomingServerInvite)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 
@@ -337,9 +340,9 @@ func AcceptServerInvite(ctx *gin.Context) {
 		Code: inviteCode,
 	}
 
-	serverInvite, err := serverCacheStore.AcceptServerInviteAndCreateMember(ctx, userID, incomingServerInvite.Code)
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusInternalServerError, "Unable to accept server invite")
+	serverInvite, appErr := serverCacheStore.AcceptServerInviteAndCreateMember(ctx, userID, incomingServerInvite.Code)
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 	utils.RespondWithSuccess(ctx, http.StatusOK, gin.H{

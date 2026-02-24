@@ -62,11 +62,11 @@ func channelMessages(ctx *gin.Context) {
 	}
 
 	memberCacheStore.HasUserServerMember(ctx, userID, serverSnowID)
-	messages, err := channelMessageStore.GetServerChannelLastMessages(ctx, serverSnowID, channelSnowID, limit, afterCursor)
+	messages, appErr := channelMessageStore.GetServerChannelLastMessages(ctx, serverSnowID, channelSnowID, limit, afterCursor)
 
 	// Validate it's a valid ID
-	if err != nil {
-		utils.RespondWithError(ctx, http.StatusBadRequest, err.Error())
+	if appErr != nil {
+		utils.RespondWithError(ctx, int(appErr.Code), appErr.Message)
 		return
 	}
 

@@ -14,6 +14,8 @@ type Consumer struct {
 	handler func(*kafka.Message) error
 }
 
+// TODO: implement the error logger here and metric for that also
+
 // New kafka consumer
 func NewConsumer(brokers []string, groupID string, topic string, handler func(*kafka.Message) error) *Consumer {
 

@@ -3,10 +3,9 @@ package serverStore
 import (
 	"context"
 	"database/sql"
-	"errors"
-	"fmt"
 
 	"github.com/himanshu3889/discore-backend/base/databases"
+	"github.com/himanshu3889/discore-backend/base/lib/appError"
 	"github.com/himanshu3889/discore-backend/base/models"
 	"github.com/himanshu3889/discore-backend/base/utils"
 
@@ -14,7 +13,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func CreateServer(ctx context.Context, server *models.Server) error {
+// Create server
+func CreateServer(ctx context.Context, server *models.Server) *appError.Error {
 	const query = `INSERT INTO servers 
 		(id, name, image_url, owner_id, created_at, updated_at) 
 		VALUES ($1, $2, $3, $4, NOW(), NOW()) 
@@ -31,13 +31,14 @@ func CreateServer(ctx context.Context, server *models.Server) error {
 			"owner_id":    server.OwnerID,
 			"image_url":   server.ImageUrl,
 		}).WithError(err).Error("Failed to create server in database")
-		return fmt.Errorf("Failed to create server for user")
+		return appError.NewInternal("Failed to create server for user")
 	}
 	return nil
 
 }
 
-func UpdateServerNameImage(ctx context.Context, server *models.Server) error {
+// Update the server name and image; FIXME: name or image ?
+func UpdateServerNameImage(ctx context.Context, server *models.Server) *appError.Error {
 	const query = `
         UPDATE servers 
         SET name = $1, image_url= $2, updated_at = NOW()
@@ -58,21 +59,21 @@ func UpdateServerNameImage(ctx context.Context, server *models.Server) error {
 				"name":      server.Name,
 				"imageUrl":  server.ImageUrl,
 			}).Warn("Server not found for update")
-			return fmt.Errorf("server not found")
+			return appError.NewNotFound("Server not found")
 		}
 		logrus.WithFields(logrus.Fields{
 			"server_id": server.ID,
 			"name":      server.Name,
 			"imageUrl":  server.ImageUrl,
 		}).WithError(err).Error("Unable to update server due to database error")
-		return errors.New("Unable to update server")
+		return appError.NewInternal("Unable to update server")
 	}
 
 	return nil
 }
 
 // Create server invite for the user; max attempts 3
-func CreateServerInvite(ctx context.Context, serverInvite *models.ServerInvite) error {
+func CreateServerInvite(ctx context.Context, serverInvite *models.ServerInvite) *appError.Error {
 	const query = `INSERT INTO server_invites 
 	(code, server_id, created_by, max_uses, expires_at, created_at) 
 	VALUES ($1, $2, $3, $4, $5, NOW()) 
@@ -102,7 +103,7 @@ func CreateServerInvite(ctx context.Context, serverInvite *models.ServerInvite) 
 				"max_uses":   serverInvite.MaxUses,
 				"attempt":    attempt,
 			}).WithError(lastErr).Error("Failed to create server invite in database")
-			return fmt.Errorf("Failed to create server invite for user")
+			return appError.NewInternal("Failed to create server invite for user")
 		}
 
 		logrus.WithFields(logrus.Fields{
@@ -118,11 +119,11 @@ func CreateServerInvite(ctx context.Context, serverInvite *models.ServerInvite) 
 		"created_by": serverInvite.CreatedBy,
 		"max_uses":   serverInvite.MaxUses,
 	}).WithError(lastErr).Error("Failed to create server invite after 5 attempts")
-	return fmt.Errorf("Failed to create server invite for user: too many collisions")
+	return appError.NewInternal("Failed to create server invite for user")
 }
 
 // Get the server invite
-func GetServerInvite(ctx context.Context, code string) (*models.ServerInvite, error) {
+func GetServerInvite(ctx context.Context, code string) (*models.ServerInvite, *appError.Error) {
 	var serverInvite models.ServerInvite
 	inviteQuery := `SELECT * FROM server_invites WHERE code=$1`
 	err := database.PostgresDB.GetContext(ctx, &serverInvite, inviteQuery, code)
@@ -130,13 +131,13 @@ func GetServerInvite(ctx context.Context, code string) (*models.ServerInvite, er
 		logrus.WithFields(logrus.Fields{
 			"invite_code": code,
 		}).WithError(err).Errorf("Failed to query the server invite in database")
-		return nil, fmt.Errorf("Failed to accept the invite")
+		return nil, appError.NewInternal("Failed to accept the invite")
 	}
 	return &serverInvite, nil
 }
 
 // Accept the server invite and create memember; if already a member then don't consume invite, return serverInvite
-func CreateServerMember(ctx context.Context, userID snowflake.ID, serverID snowflake.ID) (*models.Member, error) {
+func CreateServerMember(ctx context.Context, userID snowflake.ID, serverID snowflake.ID) (*models.Member, *appError.Error) {
 	// Try to create member
 	member := &models.Member{
 		ID:       utils.GenerateSnowflakeID(),
@@ -164,14 +165,14 @@ func CreateServerMember(ctx context.Context, userID snowflake.ID, serverID snowf
 			"server_id": member.ServerID,
 			"user_id":   member.UserID,
 		}).WithError(err).Error("Failed to create member in database")
-		return nil, errors.New("Failed to create member for server")
+		return nil, appError.NewInternal("Failed to create member for server")
 	}
 
 	return member, nil
 }
 
 // Use the server invite
-func UseServerInvite(ctx context.Context, code string) error {
+func UseServerInvite(ctx context.Context, code string) *appError.Error {
 	result, err := database.PostgresDB.ExecContext(ctx,
 		`UPDATE server_invites 
          SET used_count = used_count + 1 
@@ -185,7 +186,7 @@ func UseServerInvite(ctx context.Context, code string) error {
 		logrus.WithFields(logrus.Fields{
 			"server_invite_code": code,
 		}).WithError(err).Error("Failed to use server invite")
-		return errors.New("Failed to use server invite")
+		return appError.NewInternal("Failed to use server invite")
 	}
 
 	rowsAffected, _ := result.RowsAffected()
@@ -193,7 +194,7 @@ func UseServerInvite(ctx context.Context, code string) error {
 		logrus.WithFields(logrus.Fields{
 			"server_invite_code": code,
 		}).WithError(err).Error("Server invite is invalid, expired, or maxed out")
-		return errors.New("Server invite is invalid, expired, or maxed out")
+		return appError.NewBadRequest("Server invite is invalid, expired, or maxed out")
 	}
 	return nil
 }
