@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	baseMetrics "github.com/himanshu3889/discore-backend/base/metric"
 	coreUtils "github.com/himanshu3889/discore-backend/base/utils"
 
 	"github.com/bwmarrin/snowflake"
@@ -55,10 +56,22 @@ func NewProducer(brokers []string) *KafkaProducer {
 	}
 }
 
+// Write bulk messages to kafka
+func (p *KafkaProducer) WriteMessages(ctx context.Context, topic string, messages []kafka.Message) (sendError error) {
+	defer func() {
+		p.MessagesMetric(topic, len(messages), sendError != nil)
+	}()
+	return p.writer.WriteMessages(ctx, messages...)
+}
+
 // Send puts any data on any topic.
 // Key is used for partitioning (same key = same partition = ordering)
 // Send produces a message. It accepts optional headers to support context propagation.
-func (p *KafkaProducer) Send(ctx context.Context, topic, key string, data []byte, userID snowflake.ID, extraHeaders ...kafka.Header) error {
+func (p *KafkaProducer) Send(ctx context.Context, topic, key string, data []byte, userID snowflake.ID, extraHeaders ...kafka.Header) (sendError error) {
+
+	defer func() {
+		p.MessagesMetric(topic, 1, sendError != nil)
+	}()
 
 	// Default headers we always want
 	headers := []kafka.Header{
@@ -106,4 +119,32 @@ func (p *KafkaProducer) Send(ctx context.Context, topic, key string, data []byte
 // Close kafka producer
 func (p *KafkaProducer) Close() error {
 	return p.writer.Close()
+}
+
+// Success messages metric
+func (p *KafkaProducer) MessagesMetric(topic string, cnt int, isFailed bool) {
+	if cnt <= 0 {
+		return
+	}
+	if isFailed {
+		p.FailureMessagesMetric(topic, cnt)
+	} else {
+		p.SuccessMessagesMetric(topic, cnt)
+	}
+}
+
+// Failure messages metric
+func (p *KafkaProducer) FailureMessagesMetric(topic string, cnt int) {
+	if cnt <= 0 {
+		return
+	}
+	baseMetrics.KafkaProducerFailedMessages.WithLabelValues(topic).Inc()
+}
+
+// Success messages metric
+func (p *KafkaProducer) SuccessMessagesMetric(topic string, cnt int) {
+	if cnt <= 0 {
+		return
+	}
+	baseMetrics.KafkaProducerSuccessMessages.WithLabelValues(topic).Inc()
 }

@@ -136,37 +136,3 @@ func (client *Client) sendSubscribeConfirmation() {
 	}
 	client.send <- preparedMsg
 }
-
-// Initialize subscriber workers
-func (hub *Hub) InitSubscribeWorkers() {
-	for i := 0; i < hub.subscribe.workers; i++ {
-		hub.subscribe.wg.Add(1)
-		go hub.subscribeWorker(hub.ctx)
-	}
-}
-
-// worker to subscribe room
-func (hub *Hub) subscribeWorker(ctx context.Context) {
-	defer hub.subscribe.wg.Done()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-
-		case roomRequest, ok := <-hub.subscribe.queue:
-			if !ok {
-				// Closed
-				return
-			}
-
-			// [METRIC] : Job picked up
-			hub.MetricSubscribeQueueDepth(true)
-
-			// Process job
-			hub.BuildRoomBroadcaster(roomRequest.name)
-			hub.SubscribeRoom(roomRequest)
-
-		}
-	}
-}

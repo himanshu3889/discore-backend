@@ -1,14 +1,5 @@
 package websocketApp
 
-// Hub (1 goroutine)
-//     ├── register chan *Client
-//     ├── unregister chan *Client
-//     └── broadcast chan []byte
-
-// Each Client (2 goroutines per connection)
-//     ├── readPump → reads from conn, sends to broadcast
-//     └── writePump ← reads from client.send chan, writes to conn
-
 import (
 	"context"
 	"encoding/json"
@@ -76,25 +67,17 @@ type BroadcastRequest struct {
 	PipelineStart time.Time `json:"-"`
 }
 
-type SubscribePool struct {
-	workers int
-	queue   chan *RoomRequest
-	wg      sync.WaitGroup
-}
-
 // Constants for buffer and queue managements
 const (
-	subscribePoolQueueCnt = 10
-	registerBufferLen     = 100
-	unregisterBufferLen   = 100
-	roomOutBufferLen      = 100
-	clientBufferSize      = 20
+	registerBufferLen   = 100
+	unregisterBufferLen = 100
+	roomOutBufferLen    = 100
+	clientBufferSize    = 20
 )
 
 // Hub maintains the set of active clients and broadcasts messages to them.
 type Hub struct {
 	rooms        map[string]*RoomState // Room states
-	subscribe    *SubscribePool        //
 	totalClients int32                 // total client connections
 
 	register   chan *Client // Register clients to the hub
@@ -116,16 +99,10 @@ func newHub() *Hub {
 	brokers := strings.Split(configs.Config.KAFKA_BROKERS, ",")
 	redisClient := redisDatabase.RedisClient
 
-	subscribePool := &SubscribePool{
-		workers: 10,
-		queue:   make(chan *RoomRequest, subscribePoolQueueCnt),
-	}
-
 	return &Hub{
 		rooms:           make(map[string]*RoomState),
 		register:        make(chan *Client, registerBufferLen),
 		unregister:      make(chan *Client, unregisterBufferLen),
-		subscribe:       subscribePool,
 		producer:        baseKafka.NewProducer(brokers),
 		consumerManager: baseKafka.NewConsumerManager("websocket-hub"),
 		limiter:         redis_rate.NewLimiter(redisClient),
@@ -154,9 +131,6 @@ func InitializeHub(ctx context.Context) {
 // run starts the hub's main event loop.
 func (hub *Hub) run() {
 	logrus.Info("Running websocket hub...")
-
-	// Start the subscriber workers
-	go hub.InitSubscribeWorkers()
 
 	// Start the consumers
 	go hub.KafkaBroadcastConsumer()

@@ -56,6 +56,11 @@ func (hub *Hub) HandleIncomingMessage(client *Client, recMessage []byte) {
 
 	msg.PipelineStart = time.Now()
 
+	// If client does not join the room only allow to join room event
+	if client.room == "" && msg.Event != EventRoomJoin {
+		return
+	}
+
 	switch msg.Event {
 	case EventRoomJoin:
 		hub.handleRoomJoin(client, msg.Room)
@@ -82,21 +87,15 @@ func _validateClientRoomMessage(client *Client, msg *SocketMessage) error {
 	return nil
 }
 
+// Handle the room join; TODO: need timouts guard
 func (hub *Hub) handleRoomJoin(client *Client, room string) {
 	// Timeout pattern: Allow brief wait for subscribe
-	select {
-	case hub.subscribe.queue <- &RoomRequest{client: client, name: room}:
-		// Sent successfully
-		// [METRIC] Success! Item is now in the queue.
-		hub.MetricSubscribeQueueDepth(false)
-	case <-time.After(SubscribeTimeout):
-		client.done <- struct{}{}
-		// [METRIC]: Track dropped connections due to full queue
-		hub.MetricSubscribeQueueDrop()
-		return
-	}
+	roomRequest := &RoomRequest{client: client, name: room}
+	hub.BuildRoomBroadcaster(room)
+	hub.SubscribeRoom(roomRequest)
 }
 
+// Handle the room typing
 func (hub *Hub) handleRoomTyping(client *Client, room string) {
 	hub.mu.RLock()
 	roomState, roomExists := hub.rooms[room]

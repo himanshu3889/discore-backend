@@ -6,6 +6,8 @@ import (
 	"github.com/himanshu3889/discore-backend/base/databases"
 	"github.com/himanshu3889/discore-backend/base/lib/appError"
 	"github.com/himanshu3889/discore-backend/base/models"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/sirupsen/logrus"
 )
@@ -54,4 +56,54 @@ func CreateChannelMessage(ctx context.Context, msg *models.ChannelMessage) (*mod
 		return nil, appError.NewInternal("Failed to insert the message in channel messages")
 	}
 	return msg, nil
+}
+
+// Insert the bulk channel messages in db
+func CreateChannelMessagesBulk(ctx context.Context, msgs []*models.ChannelMessage) (failedMsgIndices []int, appErr *appError.Error) {
+	if len(msgs) == 0 {
+		return nil, nil
+	}
+
+	var validDocuments []interface{}
+	var validToOriginalIndex []int
+
+	for i, msg := range msgs {
+		deleted := false
+		msg.Deleted = &deleted
+
+		// Validate required fields
+		if msg.ID == 0 || (msg.Content == "" && msg.FileURL == nil) || msg.ServerID == 0 || msg.ChannelID == 0 || msg.UserID == 0 {
+			// Record the original index of the invalid message
+			failedMsgIndices = append(failedMsgIndices, i)
+			continue
+		}
+
+		validDocuments = append(validDocuments, msg)
+		validToOriginalIndex = append(validToOriginalIndex, i) // Track the original index
+	}
+
+	// If no valid documents, return the failed indices immediately
+	if len(validDocuments) == 0 {
+		return failedMsgIndices, nil
+	}
+
+	opts := options.InsertMany().SetOrdered(false)
+	_, err := database.MongoDB.Collection("channel_messages").InsertMany(ctx, validDocuments, opts)
+
+	if err != nil {
+		if bulkErr, ok := err.(mongo.BulkWriteException); ok {
+			logrus.Warnf("Partial DB insert: %d messages failed", len(bulkErr.WriteErrors))
+			// Match the MongoDB errors back to the original msgs index
+			for _, writeErr := range bulkErr.WriteErrors {
+				originalIndex := validToOriginalIndex[writeErr.Index]
+				failedMsgIndices = append(failedMsgIndices, originalIndex)
+			}
+			return failedMsgIndices, nil
+		}
+
+		logrus.WithError(err).Error("Fatal database error on bulk message create")
+		return failedMsgIndices, appError.NewInternal("Database bulk message insert error")
+	}
+
+	return failedMsgIndices, nil
 }

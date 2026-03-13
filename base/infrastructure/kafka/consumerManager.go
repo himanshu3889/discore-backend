@@ -29,8 +29,8 @@ func NewConsumerManager(name string) *ConsumerManager {
 }
 
 // Add registers a consumer but doesn't start it yet
-func (cm *ConsumerManager) Add(brokers []string, groupID, topic string, handler func(*kafka.Message) error) {
-	consumer := NewConsumer(brokers, groupID, topic, handler)
+func (cm *ConsumerManager) Add(cfg ConsumerConfig, singleHandler func(*kafka.Message) (error, *kafka.Message), batchHandler func([]*kafka.Message) (error, []*kafka.Message), dlqHandler func([]*kafka.Message) error) {
+	consumer := NewConsumer(cfg, singleHandler, batchHandler, dlqHandler)
 	cm.consumers = append(cm.consumers, consumer)
 }
 

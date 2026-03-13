@@ -26,20 +26,70 @@ func MakeChannelMessageHandler(producer *baseKafka.KafkaProducer) func(*kafka.Me
 	}
 }
 
-// Handle the raw message in the channel
-func HandleChannelByteMessage(msg []byte, ID snowflake.ID, userID snowflake.ID, createdAt time.Time) (*models.ChannelMessage, error) {
+// MakeChannelMessageHandler creates a closure to handle a batch of Kafka messages
+func MakeChannelMessagesHandler(producer *baseKafka.KafkaProducer) func([]*kafka.Message) (error, []*kafka.Message) {
+	return func(messages []*kafka.Message) (error, []*kafka.Message) {
+		var modelsToInsert []*models.ChannelMessage
+		var dlq []*kafka.Message
+		var validMessages []*kafka.Message
+
+		for _, msg := range messages {
+			metadata := baseKafka.ParseKafkaMessageHeaders(msg)
+			parsedMsg, err := ParseChannelByteMessage(msg.Value, metadata.TraceID, metadata.UserID, metadata.IngestTime)
+			if err != nil {
+				dlq = append(dlq, msg)
+				continue
+			}
+			modelsToInsert = append(modelsToInsert, parsedMsg)
+			validMessages = append(validMessages, msg)
+		}
+
+		if len(modelsToInsert) == 0 {
+			return nil, dlq
+		}
+
+		// Bulk insert into the database
+		ctx := context.Background()
+		failedMsgIndices, appErr := channelMessageStore.CreateChannelMessagesBulk(ctx, modelsToInsert)
+
+		// Manage the dlq
+		for _, idx := range failedMsgIndices {
+			dlq = append(dlq, validMessages[idx])
+		}
+
+		if appErr != nil {
+			return errors.New(appErr.Message), dlq
+		}
+
+		return nil, dlq
+	}
+}
+
+// unmarshals and formats the message WITHOUT saving to the DB
+func ParseChannelByteMessage(msg []byte, ID snowflake.ID, userID snowflake.ID, createdAt time.Time) (*models.ChannelMessage, error) {
 	var incomingMessage models.ChannelMessage
 
 	if err := json.Unmarshal(msg, &incomingMessage); err != nil {
 		logrus.WithError(err).Warn("Invalid message format")
 		return nil, err
 	}
+
 	incomingMessage.ID = ID
 	incomingMessage.UserID = userID
 	incomingMessage.CreatedAt = createdAt
 
+	return &incomingMessage, nil
+}
+
+// Handle the raw message in the channel
+func HandleChannelByteMessage(msg []byte, ID snowflake.ID, userID snowflake.ID, createdAt time.Time) (*models.ChannelMessage, error) {
+	incomingMessage, err := ParseChannelByteMessage(msg, ID, userID, createdAt)
+	if err != nil {
+		return nil, err
+	}
+
 	ctx := context.Background()
-	message, appErr := channelMessageStore.CreateChannelMessage(ctx, &incomingMessage)
+	message, appErr := channelMessageStore.CreateChannelMessage(ctx, incomingMessage)
 	if appErr != nil {
 		return nil, errors.New(appErr.Message)
 	}

@@ -16,14 +16,14 @@ import (
 )
 
 // Make handler for channel broadcasting
-func makeChannelBroadcastHandler(hub *Hub) func(*kafka.Message) error {
-	return func(msg *kafka.Message) error {
+func makeChannelBroadcastHandler(hub *Hub) func(*kafka.Message) (error, *kafka.Message) {
+	return func(msg *kafka.Message) (error, *kafka.Message) {
 		// logrus.Infof("RAW JSON in broadcasting: %s\n", string(msg.Value))
 
 		rawData := &json.RawMessage{}
 		err := json.Unmarshal(msg.Value, rawData)
 		if err != nil {
-			return nil
+			return nil, nil
 		}
 
 		kafkaMetadata := baseKafka.ParseKafkaMessageHeaders(msg)
@@ -38,7 +38,7 @@ func makeChannelBroadcastHandler(hub *Hub) func(*kafka.Message) error {
 
 		if !roomExists {
 			// logrus.Warnf("Room %s not found, message dropped", room)
-			return nil
+			return nil, nil
 		}
 
 		var socketMessage = &BroadcastRequest{
@@ -50,11 +50,11 @@ func makeChannelBroadcastHandler(hub *Hub) func(*kafka.Message) error {
 
 		select {
 		case roomState.outBuffer <- socketMessage: // send message to room
-			return nil
+			return nil, nil
 		case <-time.After(5 * time.Second):
 			// Optional: timeout if workers stuck too long
 			logrus.Warn("Workers overwhelmed, message dropped")
-			return nil // or return error to retry
+			return nil, nil
 		}
 	}
 }
@@ -65,7 +65,14 @@ func (hub *Hub) KafkaBroadcastConsumer() {
 	brokers := strings.Split(configs.Config.KAFKA_BROKERS, ",")
 
 	channelBroadcastHandler := makeChannelBroadcastHandler(hub)
-	hub.consumerManager.Add(brokers, "test-broadcast", "broadcast.channel-message.add", channelBroadcastHandler)
+	cfg := baseKafka.ConsumerConfig{
+		Brokers:     brokers,
+		GroupID:     "test-broadcast-2",
+		Topic:       "broadcast.channel-message.add",
+		AutoCommit:  false, // no auto commit
+		StartOffset: kafka.LastOffset,
+	}
+	hub.consumerManager.Add(cfg, channelBroadcastHandler, nil, nil)
 
 	// Start all
 	go hub.consumerManager.Start()

@@ -11,6 +11,8 @@ import (
 
 	"github.com/bwmarrin/snowflake"
 	"github.com/gin-gonic/gin"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type contextKey string
@@ -54,8 +56,15 @@ func GrpcAuthMiddleware() gin.HandlerFunc {
 
 		resp, err := grpcService.ValidateToken(accessToken)
 		if err != nil {
-			utils.RespondWithError(ctx, http.StatusUnauthorized, "Unauthorized")
-			logrus.WithError(err).Error("grpc error")
+			st, ok := status.FromError(err)
+
+			if ok && st.Code() == codes.Unauthenticated {
+				utils.RespondWithError(ctx, http.StatusUnauthorized, "Unauthorized")
+				return
+			}
+
+			logrus.WithError(err).Error("unexpected grpc error during token validation")
+			utils.RespondWithError(ctx, http.StatusInternalServerError, "Internal Server Error")
 			return
 		}
 

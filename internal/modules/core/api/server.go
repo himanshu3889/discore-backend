@@ -27,8 +27,8 @@ func serverRoutes(rg *gin.RouterGroup) {
 	rg.GET("/:serverID/user", UserServer)
 	rg.GET("/user/all-joined", UserAllJoinedServers)
 	rg.GET("/:serverID/user/channels", UserServerChannels)
-	rg.POST("/:serverID/invite-code", CreateServerInvite)
-	rg.POST("/accept-invite/:inviteCode", AcceptServerInvite)
+	rg.POST("/:serverID/invite", CreateServerInvite)
+	rg.POST("/invite/:inviteCode", AcceptServerInvite)
 	rg.GET("/:serverID/members", GetServerMembers)
 }
 
