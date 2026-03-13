@@ -6,6 +6,7 @@
 The goal of this project is not feature completeness, but **architectural correctness under stress**: handling high connection counts, bursty traffic, and large fan-out workloads. It explores practical distributed systems patterns such as message streaming, request coalescing, rate limiting, and WebSocket session management.
 
 ![System Design Architecture](https://drive.google.com/thumbnail?id=1l7gvNXhPW8277iZFMiOoQteJFKrEgJkV&sz=w5000)
+> **Excalidraw file** [Discore Exaclidraw](https://drive.google.com/file/d/1tq98XIYvX-SDkDEyI04xXDJN9GsOaE9B/view?usp=sharing).
 
 > **Looking for the frontend?** Check out the [Discore Frontend Repository](https://github.com/himanshu3889/discore-frontend).
 ---
