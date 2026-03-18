@@ -23,6 +23,7 @@ type Member struct {
 	CreatedAt time.Time    `db:"created_at" json:"-"`
 	UpdatedAt time.Time    `db:"updated_at" json:"-"`
 	// could use the invite code joined; null no need foreign relation
-	DeletedAt *time.Time `db:"deleted_at" json:"-"`
-	User      *User      `json:"user"` // not in db; used in join
+	DeletedAt      *time.Time `db:"deleted_at" json:"-"`
+	User           *User      `json:"user"` // not in db; used in join
+	InviteCodeUsed *string    `db:"invite_code_used" json:"-"`
 }

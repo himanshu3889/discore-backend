@@ -137,25 +137,31 @@ func GetServerInvite(ctx context.Context, code string) (*models.ServerInvite, *a
 }
 
 // Accept the server invite and create memember; if already a member then don't consume invite, return serverInvite
-func CreateServerMember(ctx context.Context, userID snowflake.ID, serverID snowflake.ID) (*models.Member, *appError.Error) {
+func CreateServerMember(ctx context.Context, userID snowflake.ID, serverID snowflake.ID, inviteCodeUsed *string) (*models.Member, *appError.Error) {
 	// Try to create member
 	member := &models.Member{
-		ID:       utils.GenerateSnowflakeID(),
-		UserID:   userID,
-		ServerID: serverID,
-		Role:     "GUEST",
+		ID:             utils.GenerateSnowflakeID(),
+		UserID:         userID,
+		ServerID:       serverID,
+		Role:           "GUEST",
+		InviteCodeUsed: inviteCodeUsed,
 	}
 
+	// fmt.Print("inviteCode ", inviteCodeUsed, "\n")
+	// return member, nil
+
 	// Returning *
-	insertQuery := `INSERT INTO members (id, role, user_id, server_id, created_at, updated_at)
-                    VALUES ($1, $2, $3, $4, NOW(), NOW())
+	insertQuery := `INSERT INTO members (id, role, user_id, server_id, invite_code_used, created_at, updated_at)
+                    VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
                     RETURNING *`
 
 	err := database.PostgresDB.GetContext(ctx, member, insertQuery,
 		member.ID,
 		member.Role,
 		member.UserID,
-		member.ServerID)
+		member.ServerID,
+		member.InviteCodeUsed,
+	)
 	if err != nil {
 		if utils.IsDBUniqueViolationError(err) {
 			return member, nil // errors.New("Already a member of this server")
@@ -172,14 +178,16 @@ func CreateServerMember(ctx context.Context, userID snowflake.ID, serverID snowf
 }
 
 // Use the server invite
-func UseServerInvite(ctx context.Context, code string) *appError.Error {
+func UseServerInvite(ctx context.Context, code string, incrementBy int) *appError.Error {
+	if incrementBy <= 0 {
+		return appError.NewBadRequest("Increment amount must be greater than zero")
+	}
 	result, err := database.PostgresDB.ExecContext(ctx,
 		`UPDATE server_invites 
-         SET used_count = used_count + 1 
-         WHERE code = $1 
-           AND (max_uses IS NULL OR used_count < max_uses)
-           AND (expires_at IS NULL OR expires_at > NOW())`, // expiration check
+         SET used_count = used_count + $2
+         WHERE code = $1`,
 		code,
+		incrementBy,
 	)
 
 	if err != nil {

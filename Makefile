@@ -10,7 +10,7 @@ POSTGRES_PASSWORD=discore
 
 # Migrate commands
 
-MIGRATE = migrate -path internal/base/migrations/postgres -database "postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=disable"
+MIGRATE = migrate -path base/migrations/postgres -database "postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=disable"
 
 # (not real files)
 .PHONY: migrate-up migrate-down migrate-version migrate-new
@@ -49,7 +49,7 @@ down-mon:
 	docker compose down prometheus grafana loki
 
 up-sys:
-	docker compose up -d postgres mongodb redis kafka
+	docker compose up -d postgres mongodb redis kafka debezium
 
 down-sys:
 	docker compose down
@@ -84,6 +84,11 @@ kafka-grp:
 kafka-grp-describe:
 	$(KAFKA_GROUP_CMD) --describe --group $(group)
 
+kafka-topics:
+	$(KAFKA_TOPIC_CMD) $(args)
+
+kafka-consumer:
+	$(KAFKA_CONSUMER_CMD) $(args)
 
 # GRPC proto builds
 build-proto:
@@ -95,3 +100,9 @@ air-gateway:
 
 air-modules:
 	air -c .air.modules.toml
+
+
+# DEBEZIUM CONNECTOR
+
+deb-status:  # windows curl.exe  ; mac/linux: curl
+	curl.exe -s http://localhost:8083/connectors/discore-connector/status 

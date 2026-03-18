@@ -10,8 +10,19 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
+      - ./base/cdc/scripts:/scripts    # cdc debezium scripts
       - postgres_data:/var/lib/postgresql/data
       # - ./migrations:/docker-entrypoint-initdb.d:ro  # for migrations
+
+    command: 
+      # for the debezium connection
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_wal_senders=10"
+      - "-c"
+      - "max_replication_slots=10"
     ports: ["5432:5432"]
     networks: [discore-net]
     restart: unless-stopped
@@ -94,7 +105,7 @@ services:
       - "9093:9093"   # Internal controller communication (KRaft)
     environment:
       # Explicitly enable KRaft mode (Kafka without ZooKeeper)
-      KAFKA_KRAFT_MODE: 'true'
+      # KAFKA_KRAFT_MODE: 'true'
       
       # Core KRaft settings - no ZooKeeper needed
       # Unique ID for this broker node 
@@ -110,13 +121,14 @@ services:
       
       # Listener configuration
       # PLAINTEXT: Client traffic (9092), CONTROLLER: Internal KRaft quorum (9093)
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
       # What clients see when connecting (uses KAFKA_HOST env var or defaults to localhost)
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://${KAFKA_HOST:-localhost}:9092
+      # INTERNAL for Docker containers, EXTERNAL for host machine
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://discore-kafka:29092,EXTERNAL://localhost:9092
       # Maps listener names to security protocols (PLAINTEXT = no auth)
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
       # Which listener brokers use to talk to each other
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       # Which listener is reserved for the KRaft controller quorum
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       
@@ -169,11 +181,52 @@ services:
     restart: unless-stopped
     healthcheck:
       # Check if Kafka is responsive by listing topics
-      test: ["CMD", "kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"]
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server discore-kafka:9092 > /dev/null 2>&1 || exit 1"]
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 10
+      start_period: 60s  # KRaft needs time to initialize
 
+
+  # Kafka Connect with Debezium
+  debezium:
+    image: debezium/connect:2.7.3.Final
+    container_name: discore-debezium
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: discore-kafka:29092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: connect_configs
+      OFFSET_STORAGE_TOPIC: connect_offsets
+      STATUS_STORAGE_TOPIC: connect_statuses
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECTOR_CLIENT_CONFIG_OVERRIDE_POLICY: "All"
+    depends_on:
+      - kafka
+    networks: [discore-net]
+
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: discore-kafka-ui
+    ports:
+      - "8085:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=discore-cluster
+      # Connects using the INTERNAL listener you defined earlier
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=discore-kafka:29092
+      # Allows you to view your Kafka Connect clusters in the UI as well
+      - KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME=debezium
+      - KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS=http://discore-debezium:8083
+      - DYNAMIC_CONFIG_ENABLED=true
+    networks: [discore-net]
+    depends_on:
+      - kafka
+      - debezium
 
   # Main App
   app:

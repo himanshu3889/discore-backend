@@ -9,6 +9,7 @@ import (
 	"time"
 
 	baseApi "github.com/himanshu3889/discore-backend/base/api"
+	baseCDC "github.com/himanshu3889/discore-backend/base/cdc"
 	clerkClient "github.com/himanshu3889/discore-backend/base/clients/clerk"
 	"github.com/himanshu3889/discore-backend/base/databases"
 	redisDatabase "github.com/himanshu3889/discore-backend/base/infrastructure/redis"
@@ -19,6 +20,7 @@ import (
 	chatApi "github.com/himanshu3889/discore-backend/internal/modules/chat/api"
 	ChatkafkaService "github.com/himanshu3889/discore-backend/internal/modules/chat/services/kafka"
 	coreApi "github.com/himanshu3889/discore-backend/internal/modules/core/api"
+	coreKafkaService "github.com/himanshu3889/discore-backend/internal/modules/core/services/kafka"
 	websocketApi "github.com/himanshu3889/discore-backend/internal/modules/websocket/api"
 	websocketApp "github.com/himanshu3889/discore-backend/internal/modules/websocket/application"
 	"google.golang.org/grpc"
@@ -98,15 +100,41 @@ func (s *ModuleServer) Initialize() {
 	app.SetState(conn)
 	logrus.Info("🔗 GRPC Connected to Auth Service")
 
-	// Start Kafka consumer in background
+	// Debezium connector in background
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
 				logrus.Errorf("Panic recovered in Kafka consumer: %v", r)
 			}
 		}()
+		kafkaConnectURL := "http://localhost:8083"
+		configFilePath := "./base/cdc/registerPostgres.json"
+		err := baseCDC.SetupConnector(kafkaConnectURL, configFilePath)
+		if err != nil {
+			logrus.WithError(err).Errorf("Error connecting debezium connector")
+		}
+	}()
+
+	// Start Chat Kafka consumer in background
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logrus.Errorf("Panic recovered in Chat Kafka consumer: %v", r)
+			}
+		}()
 		ChatkafkaService.KafkaChatConsumer()
 	}()
+
+	// Start Core Kafka consumer in background
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logrus.Errorf("Panic recovered in Core Kafka consumer: %v", r)
+			}
+		}()
+		coreKafkaService.KafkaCoreConsumers()
+	}()
+
 }
 
 func (s *ModuleServer) Start() error {

@@ -127,7 +127,9 @@ func (c *Consumer) runSingleAutoCommit(ctx context.Context) error {
 		err, dlq := c.singleHandler(&msg)
 		if dlq != nil {
 			c.FailureMessagesMetric(1)
-			c.dlqHandler([]*kafka.Message{dlq})
+			if c.dlqHandler != nil {
+				c.dlqHandler([]*kafka.Message{dlq})
+			}
 		} else {
 			c.SuccessMessagesMetric(1)
 		}
@@ -155,7 +157,9 @@ func (c *Consumer) runSingleManualCommit(ctx context.Context) error {
 		}
 		if dlq != nil {
 			c.FailureMessagesMetric(1)
-			c.dlqHandler([]*kafka.Message{dlq})
+			if c.dlqHandler != nil {
+				c.dlqHandler([]*kafka.Message{dlq})
+			}
 		} else {
 			c.SuccessMessagesMetric(1)
 		}
@@ -203,8 +207,12 @@ func (c *Consumer) runBatchAutoCommit(ctx context.Context) error {
 		c.SuccessMessagesMetric(successMessageCnt)
 
 		if dlq != nil {
-			c.dlqHandler(dlq)
-			// TODO: Here can use the metric here; which topics we are pushing to the dlq
+			if c.dlqHandler != nil { // TODO: Here can use the metric how many we are pushing to the dlq
+				c.dlqHandler(dlq)
+			} else {
+				// Log a warning
+				logrus.Warn("DLQ messages received but no dlqHandler is configured")
+			}
 		}
 
 		return nil
@@ -274,10 +282,15 @@ func (c *Consumer) runBatchManualCommit(ctx context.Context) error {
 		c.SuccessMessagesMetric(successMessageCnt)
 
 		if dlq != nil {
-			err := c.dlqHandler(dlq) // TODO: Here can use the metric how many we are pushing to the dlq
-			if err != nil {
-				// dlq failed no more process; no commit etc
-				return err
+			if c.dlqHandler != nil { // TODO: Here can use the metric how many we are pushing to the dlq
+				err := c.dlqHandler(dlq)
+				if err != nil {
+					// dlq failed no more process; no commit etc
+					return err
+				}
+			} else {
+				// Log a warning
+				logrus.Warn("DLQ messages received but no dlqHandler is configured")
 			}
 		}
 

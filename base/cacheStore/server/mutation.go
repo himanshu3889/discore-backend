@@ -175,16 +175,12 @@ func AcceptServerInviteAndCreateMember(ctx context.Context, userID snowflake.ID,
 	}
 
 	// Create member
-	_, appErr = serverStore.CreateServerMember(ctx, userID, serverInvite.ServerID)
+	_, appErr = serverStore.CreateServerMember(ctx, userID, serverInvite.ServerID, &code)
 	if appErr != nil {
 		// Error creating the member rollback the consume invite
 		serverInviteLib.RollbackConsumeServerInviteCache(ctx, serverInvite)
 		return nil, appErr
 	}
 
-	// FIXME: If here server crashed, it cause inconsistency, better use CDC on the members table
-	go func() {
-		serverStore.UseServerInvite(ctx, serverInvite.Code)
-	}()
 	return serverInvite, appErr
 }
