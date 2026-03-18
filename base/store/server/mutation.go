@@ -147,9 +147,6 @@ func CreateServerMember(ctx context.Context, userID snowflake.ID, serverID snowf
 		InviteCodeUsed: inviteCodeUsed,
 	}
 
-	// fmt.Print("inviteCode ", inviteCodeUsed, "\n")
-	// return member, nil
-
 	// Returning *
 	insertQuery := `INSERT INTO members (id, role, user_id, server_id, invite_code_used, created_at, updated_at)
                     VALUES ($1, $2, $3, $4, $5, NOW(), NOW())

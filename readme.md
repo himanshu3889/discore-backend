@@ -76,6 +76,23 @@ Loki handles the **"Find that error in my WebSocket handler logs"** problem.
 
 - **The Solution:** Loki only indexes labels like service name, log level, or handler type—not every word. You filter by `handler=websocket` and `level=error` first, then search content. Storage stays cheap and you still find that connection timeout error fast. Works directly with Grafana so you click from a metric spike to the exact log lines that caused it.
 
+To make this architecture description "better," we need to move beyond simple definitions and explain the **operational reality**—addressing the "other problems" like race conditions, duplicate events, and data consistency that come with CDC and Kafka.
+
+Here is a more sophisticated, "production-grade" addition for your documentation:
+
+---
+
+### Why Debezium for CDC?
+
+Debezium solves the **"Dual-Write"** and **"Distributed Consistency"** problems.
+
+- **The Problem (The Dual-Write Trap):** In a chat app, one user action (joining a server) requires updating multiple systems: PostgreSQL (Membership), Redis (Cache), and PostgreSQL again (Invite Count). If your API tries to update all three and the third one fails, your system is now in a "zombie" state-the user is in the server, but the invite count is wrong. 
+- **The Solution:** Instead of the API trying to manage multiple updates, it performs a **single transaction** in PostgreSQL. Debezium monitors the **Write-Ahead Log (WAL)** and streams that single truth into Kafka. Other services "react" to this change. If an update fails, the Kafka consumer retries until it succeeds, ensuring **Eventual Consistency** without blocking the user's request.
+
+- **Guaranteed Delivery:** Since Debezium reads the transaction log, it captures changes even if the application crashes. No "join" event is ever lost.
+- **Race Condition Prevention:** By using the table's Primary Key as the Kafka Message Key, Debezium ensures that all changes for a specific user or server are processed **in order** by the same consumer worker.
+- **Auditability:** It provides a perfect "Before" and "After" snapshot of every row change, making it trivial to debug exactly why a piece of data changed at 3 AM.
+
 ---
 
 ## 🛠 Deep Dive - Engineering Patterns
