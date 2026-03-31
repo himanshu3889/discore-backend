@@ -3,7 +3,10 @@
 
 **Discore** is a backend system designed to simulate how a production-scale chat service behaves under heavy load.
 
-The goal of this project is not feature completeness, but **architectural correctness under stress**: handling high connection counts, bursty traffic, and large fan-out workloads. It explores practical distributed systems patterns such as message streaming, request coalescing, rate limiting, and WebSocket session management.
+The goal of this project is not feature completeness, but **architectural correctness under stress**: handling high connection counts, bursty traffic, and large fan-out workloads while keeping performance predictable and latency low. 
+It explores practical distributed systems patterns such as message streaming, request coalescing, rate limiting, and WebSocket session management.
+
+It is designed as a playground for system design decisions that matter when scale breaks simple solutions.
 
 ![System Design Architecture](https://drive.google.com/thumbnail?id=1l7gvNXhPW8277iZFMiOoQteJFKrEgJkV&sz=w5000)
 > **Excalidraw file** [Discore Exaclidraw](https://drive.google.com/file/d/1tq98XIYvX-SDkDEyI04xXDJN9GsOaE9B/view?usp=sharing).
